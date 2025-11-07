@@ -5,12 +5,13 @@ general_sir <- function(t,y, pars, C, Nage,Nimmunity){
   alphas <- pars[2:(length(pars)-1)] ## Vector of susceptibility parameters
   
   ## Generate matrix for compartment sizes
-  sir <- matrix(y,ncol=Nage*Nimmunity,nrow=3)
+  sir <- matrix(y,ncol=Nage*Nimmunity,nrow=4)
   dS <- -(alphas*sir[1,]) * (beta*sir[2,] %*% t(C))
   dR <- sir[2,]/Tg
   dI <- -dS - dR
+  dInc <- (alphas*sir[1,]) * (beta*sir[2,] %*% t(C))
   
-  tmp <- as.vector(rbind(dS,dI,dR))
+  tmp <- as.vector(rbind(dS,dI,dR,dInc))
   
   return(list(c(tmp)))
 }
@@ -22,15 +23,16 @@ general_sir_explicit <- function(t,y, pars, C, Nage,Nimmunity){
   alphas <- pars[2:(length(pars)-1)] ## Vector of susceptibility parameters
   
   ## Generate matrix for compartment sizes
-  sir <- matrix(y,ncol=Nage*Nimmunity,nrow=3)
+  sir <- matrix(y,ncol=Nage*Nimmunity,nrow=4)
   N <- colSums(sir)
   M <- t(apply(C, 1, function(x) x/N))
   M[!is.finite(M)] <- 0
   dS <- -(alphas*sir[1,]) * apply(M, 1, function(x) sum(beta*sir[2,]*x))
   dR <- sir[2,]/Tg
   dI <- -dS - dR
+  dInc <- (alphas*sir[1,]) * apply(M, 1, function(x) sum(beta*sir[2,]*x))
   
-  tmp <- as.vector(rbind(dS,dI,dR))
+  tmp <- as.vector(rbind(dS,dI,dR,dInc))
   
   return(list(c(tmp)))
 }
@@ -60,16 +62,19 @@ epi_ode_size <- function(C1, beta, Tg, Ns, alphas,
   
   ## Generate starting populations.
   ## This generates a vector with S, I and R for each age class and immunity class
-  ## ie. S_11, I_11, R_11, S_12, I_12, R_12, S_22, ... etc.
+  ## ie. S_11, I_11, R_11, incidence_11, S_12, I_12, R_12, incidence_12, S_22, ... etc.
   ## where S_ak gives the number susceptible in age class 1, immunity class k
   long_Ns <- as.numeric(t(Ns))
   start <- NULL
   start[1] <- long_Ns[1]
   start[2] <- 0
   start[3] <- 0
-  index <- 4
+  start[4] <- 0
+  index <- 5
   for(i in 2:length(long_Ns)){
     start[index] <- long_Ns[i]
+    index <- index + 1
+    start[index] <- 0
     index <- index + 1
     start[index] <- 0
     index <- index + 1
@@ -80,8 +85,8 @@ epi_ode_size <- function(C1, beta, Tg, Ns, alphas,
   
   ## Move one susceptible to the infected classes for the seed population
   for(age_seed in age_seeds){
-    start[(age_seed-1)*3*Nimmunity + (immunity_seed-1)*3+1] <- start[(age_seed-1)*3*Nimmunity + (immunity_seed-1)*3+1] - 1
-    start[(age_seed-1)*3*Nimmunity + (immunity_seed-1)*3+2] <- start[(age_seed-1)*3*Nimmunity + (immunity_seed-1)*3+2] + 1
+    start[(age_seed-1)*4*Nimmunity + (immunity_seed-1)*4+1] <- start[(age_seed-1)*4*Nimmunity + (immunity_seed-1)*4+1] - 1
+    start[(age_seed-1)*4*Nimmunity + (immunity_seed-1)*4+2] <- start[(age_seed-1)*4*Nimmunity + (immunity_seed-1)*4+2] + 1
   }
   #start[(age_seed + (immunity_seed-1) - 1)*3 + 1] <- start[(age_seed + (immunity_seed-1) - 1)*3 + 1] - 1
   #  start[(age_seed + (immunity_seed-1) - 1)*3 + 2] <- start[(age_seed + (immunity_seed-1) - 1)*3 + 2] + 1
@@ -95,11 +100,13 @@ epi_ode_size <- function(C1, beta, Tg, Ns, alphas,
   ## Pull out the solved model.
   y <- as.data.frame(y)
   y <- y[,2:ncol(y)]
-  
+
   ## Label which disease state each column is
-  colnames(y) <- rep(c("S","I","R"), Nage*Nimmunity)
+  colnames(y) <- rep(c("S","I","R","inc"), Nage*Nimmunity)
   
   if(return_compartments){
+    colnames(y) <- expand_grid(age=1:Nage,immunity=1:Nimmunity,compartment=c("S","I","R","inc")) %>% 
+      mutate(name = paste0(compartment,"_",age,"_",immunity)) %>% pull(name)
     return(y)
   }
   
