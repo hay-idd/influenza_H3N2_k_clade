@@ -15,5 +15,7 @@ Age groups:
 Percentage of detected respiratory viruses among all samples with completed testing in England by age group, GP sentinel swabbing:
 percentages detected by age.csv
 
+overall_subtype_percentages.csv , doesn't have data for 2021
 
-case_counts_england_2017_2025.csv : from the annual report Influenza in the UK, annual epidemiological report: winter 2024 to 2025
+case_counts_england_2009_2025.csv : from the annual reports Influenza in the UK, annual epidemiological report: winter 2024 to 2025
+                                            Winter 2023 to 2024 season
