@@ -1,6 +1,7 @@
 library(tidyverse)
 library(ggplot2)
-
+theme_psi <- theme_bw
+setwd("~/Documents/GitHub/influenza_H3N2_k_clade/")
 files <- list.files("data/RCGP/")
 
 files <- files[files != "pos_rcgp.csv"]
@@ -117,7 +118,7 @@ all_dat_comb <- all_dat_comb %>% filter(age_new != "Combined")
 all_dat_comb$age_new <- factor(all_dat_comb$age_new, levels=c("0-4 years","5-14 years","15-64 years","65+ years"))
 ## ILI+
 
-ggplot(all_dat_comb %>% filter(date >= "2025-08-01")) +
+p1 <- ggplot(all_dat_comb %>% filter(date >= "2025-08-01")) +
   annotate("rect",xmin=ymd("2025-09-02"),xmax=ymd("2025-10-24"),ymin=-Inf,ymax=Inf,fill="red",alpha=0.25)+
   annotate("rect",xmin=ymd("2025-10-24"),xmax=ymd("2025-11-03"),ymin=-Inf,ymax=Inf,fill="green",alpha=0.25)+  
   geom_label(x=ymd("2025-10-01"),y=2.2,label="Autumn term",size=5)+
@@ -131,7 +132,7 @@ ggplot(all_dat_comb %>% filter(date >= "2025-08-01")) +
   scale_color_viridis_d("") +
   theme_psi()
 
-ggplot(all_dat_comb %>% filter(date >= "2025-08-01")) +
+p2 <- ggplot(all_dat_comb %>% filter(date >= "2025-08-01")) +
   annotate("rect",xmin=ymd("2025-09-02"),xmax=ymd("2025-10-24"),ymin=-Inf,ymax=Inf,fill="red",alpha=0.25)+
   annotate("rect",xmin=ymd("2025-10-24"),xmax=ymd("2025-11-03"),ymin=-Inf,ymax=Inf,fill="green",alpha=0.25)+  
   geom_label(x=ymd("2025-10-01"),y=1.1,label="Autumn term",size=5)+
@@ -145,7 +146,7 @@ ggplot(all_dat_comb %>% filter(date >= "2025-08-01")) +
   theme_psi()
 
 
-ggplot(all_dat_comb%>% filter(date >= "2025-08-01")) +
+p3 <- ggplot(all_dat_comb%>% filter(date >= "2025-08-01")) +
   geom_hline(yintercept=0,linetype="dashed") +
   annotate("rect",xmin=ymd("2025-09-02"),xmax=ymd("2025-10-24"),ymin=-Inf,ymax=Inf,fill="red",alpha=0.25)+
   annotate("rect",xmin=ymd("2025-10-24"),xmax=ymd("2025-11-03"),ymin=-Inf,ymax=Inf,fill="green",alpha=0.25)+  
@@ -164,7 +165,7 @@ ggplot(all_dat_comb%>% filter(date >= "2025-08-01")) +
   #geom_smooth(aes(x=date + 7,y=gr,col=age_new),method="loess",se=FALSE,span=0.5)
 
 
-ggplot(all_dat_comb%>% filter(date >= "2025-08-01")) +
+p4 <- ggplot(all_dat_comb%>% filter(date >= "2025-08-01")) +
   geom_hline(yintercept=0,linetype="dashed") +
   annotate("rect",xmin=ymd("2025-09-02"),xmax=ymd("2025-10-24"),ymin=-Inf,ymax=Inf,fill="red",alpha=0.25)+
   annotate("rect",xmin=ymd("2025-10-24"),xmax=ymd("2025-11-03"),ymin=-Inf,ymax=Inf,fill="green",alpha=0.25)+  
@@ -179,3 +180,6 @@ ggplot(all_dat_comb%>% filter(date >= "2025-08-01")) +
   scale_color_viridis_d("") +
   xlab("Date (end of reporting week)") +
   theme_psi()
+
+library(patchwork)
+p1/p2/p4
