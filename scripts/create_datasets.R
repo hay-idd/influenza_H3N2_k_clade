@@ -41,7 +41,7 @@ ili_cases_older <- read_csv("data/rcgp_by_age/data_23_22_21.csv")%>%
 ## Get overall ILI cases
 ili_cases_all <- bind_rows(ili_cases_recent %>% select(Year, Week, `All ages`), ili_cases_older %>% select(Year, Week, `All ages`)) %>% arrange(Year, Week)
 ili_cases_all <- ili_cases_all %>% mutate(
-  date = epiweek_to_date_formula(Year,Week,TRUE)
+  date = epiweek_to_date_formula(Year,Week,FALSE)
 )
 ## Get actual start and end dates of the Epi weeks
 p_ili_all <- ggplot(ili_cases_all, aes(x=date, y=`All ages`*N_england/100000)) + geom_line() + theme_use + xlab("Date (start of Epi week)") + ylab("ILI cases (RCGP, England, all ages)") +
@@ -51,7 +51,7 @@ ggsave(filename=paste0(save_wd,"ili_all_rcgp.png"),p_ili_all,width=8,height=4,un
 ## Create age-structured data. Need to combine different age groups and re-weight
 ## Recent data
 ili_cases_recent <- ili_cases_recent %>% mutate(
-  date = epiweek_to_date_formula(Year,Week,TRUE)
+  date = epiweek_to_date_formula(Year,Week,FALSE)
 )
 ili_cases_recent <- ili_cases_recent %>% select(-`All ages`) %>% pivot_longer(-c(Year,Week,date))
 ili_cases_recent <- extract_age_range(ili_cases_recent)
@@ -61,7 +61,7 @@ ili_cases_recent_expanded <- ili_cases_recent_expanded %>% left_join(age_groups 
 
 ## Older data
 ili_cases_older <- ili_cases_older %>% mutate(
-  date = epiweek_to_date_formula(Year,Week,TRUE)
+  date = epiweek_to_date_formula(Year,Week,FALSE)
 )
 ili_cases_older <- ili_cases_older %>% select(-`All ages`) %>% pivot_longer(-c(Year,Week,date))
 ili_cases_older <- extract_age_range(ili_cases_older)
@@ -74,7 +74,7 @@ ili_cases_comb_expanded <- bind_rows(ili_cases_older_expanded, ili_cases_recent_
 ## Be very careful, as older data does not have any data on 0 year olds, so need to request 1-14 only
 ili_cases_comb_expanded_grouped <- combine_age_groups_ILI(ili_cases_comb_expanded,desired_age_groups)
 
-ggplot(ili_cases_comb_expanded_grouped) + 
+p_ili_by_age <- ggplot(ili_cases_comb_expanded_grouped) + 
   geom_line(aes(x=date,y=ILI*100000/N,colour=group)) + 
   theme_use + 
   xlab("Date (start of Epi week)") + 
@@ -94,12 +94,15 @@ flu_pos_recent <- flu_pos_recent %>% rename(date=Date,Week=`Week number`) %>% se
 flu_pos_recent <- expand_age_group_pos(flu_pos_recent) %>% left_join(age_groups %>% rename(age=age_group))
 flu_pos_recent <- combine_age_groups_pos(flu_pos_recent,desired_age_groups)
 
+## Need to shift days +6 as this is start of reporting period
+flu_pos_recent$date <- flu_pos_recent$date + 6
+
 flu_pos_old <- read_csv("data/ukhsa/datamart_weekly_positivity_2.csv") %>% 
   rename(Year=year,Week=week) %>%
   fill(Year,.direction="down") %>% 
   arrange(Year,Week) %>% drop_na()
 flu_pos_old <- flu_pos_old %>% mutate(
-  date = epiweek_to_date_formula(Year,Week,TRUE)
+  date = epiweek_to_date_formula(Year,Week,FALSE)
 ) 
 
 flu_pos_old <- flu_pos_old %>% pivot_longer(-c(date,Week,Year)) %>% rename(age_group=name,positivity=value) %>%
@@ -110,8 +113,15 @@ flu_pos_old <- combine_age_groups_pos(flu_pos_old,desired_age_groups)
 
 flu_pos_comb <- bind_rows(flu_pos_old,flu_pos_recent)
 
-left_join(ili_cases_comb_expanded_grouped,flu_pos_comb_grouped) %>% drop_na() %>% mutate(ILIplus = ILI*positivity) %>%
-  ggplot() + geom_line(aes(x=date,y=ILIplus,col=group))
+p_influenza_cases_age <- left_join(ili_cases_comb_expanded_grouped,flu_pos_comb) %>% drop_na() %>% 
+  mutate(ILIplus = ILI*positivity) %>%
+  ggplot() + geom_line(aes(x=date,y=ILIplus,col=group))+ 
+  theme_use + 
+  xlab("Date (start of Epi week)") + 
+  ylab("Estimated influenza cases (RCGP and Resp DataMart,\n England, by age group)") +
+  scale_x_date(date_labels="%b %Y",date_breaks="1 year") +
+  scale_colour_brewer(palette="Set1",name="Age group")
+
 
 ######################################################
 ## Third dataset -- % influenza tests which are H3
@@ -129,7 +139,11 @@ flu_H3 <- flu_H3 %>%
   select(-subtype) %>%
   rename(percentage_h3=percentage)
 
-final_dataset <- left_join(ili_cases_comb_expanded_grouped,flu_pos_comb_grouped %>% select(-N)) %>% left_join(flu_H3) %>% drop_na() %>%
+## Shift to end of reporting period
+flu_H3$date <- flu_H3$date + 6
+
+final_dataset <- left_join(ili_cases_comb_expanded_grouped,flu_pos_comb %>% select(-N)) %>% drop_na() %>%
+  left_join(flu_H3) %>% drop_na() %>%
   mutate(
     Influenza_cases = ILI*positivity,
     ILIplus=ILI*positivity*percentage_h3)
@@ -143,7 +157,7 @@ ggplot(final_dataset) +
   geom_line(aes(x=date,y=ILIplus,col="A/H3N2 cases")) +
   facet_wrap(~group)
 
-final_dataset %>% 
+p_final <- final_dataset %>% 
   select(date,group,ILI,Influenza_cases,ILIplus) %>% 
   pivot_longer(-c(group,date)) %>% 
   mutate(name=factor(name,levels=c("ILI","Influenza_cases","ILIplus"))) %>%
@@ -184,6 +198,7 @@ flunet_data <- flunet_data %>%
 flunet_data <- flunet_data %>% group_by(week_start) %>% summarize(H3_sum = sum(H3_adj))
 flunet_data <- flunet_data %>% rename(date=week_start) %>% mutate(Year=lubridate::year(date),
                                                         Week=lubridate::isoweek(date))
+flunet_data$date <- flunet_data$date + 6
 write_csv(flunet_data,"data/final/flunet_h3_cases_historic.csv")
 
 p1 <- ggplot(flunet_data) + geom_line(aes(x=date,y=H3_sum,col="WHO FluNet"),linewidth=0.65) +
@@ -191,14 +206,23 @@ p1 <- ggplot(flunet_data) + geom_line(aes(x=date,y=H3_sum,col="WHO FluNet"),line
   geom_line(data=final_dataset %>% group_by(date) %>% summarize(ILIplus=sum(ILIplus)),aes(x=date,y=ILIplus,col="RCGP ILI+"),linewidth=0.65) +
   theme_use +
   xlab("Date (start of Epi week") +
-  ylab("Estimated number of H3 cases/samples") +
+  ylab("Estimated number of H3\n cases or samples") +
   scale_colour_brewer(palette="Set1",name="Data source")
 p2 <- ggplot(flunet_data %>% filter(Year >= 2023)) + geom_line(aes(x=date,y=H3_sum,col="WHO FluNet"),linewidth=0.65) +
   geom_line(data=influenza_cases_eng%>% filter(Year >= 2023),aes(x=date,y=`Influenza A H3N2`,col="UKHSA"),linewidth=0.65) +
   geom_line(data=final_dataset %>% filter(Year >= 2023) %>% group_by(date) %>% summarize(ILIplus=sum(ILIplus)),aes(x=date,y=ILIplus,col="RCGP ILI+"),linewidth=0.65) +
   theme_use +
   xlab("Date (start of Epi week") +
-  ylab("Estimated number of H3 cases/samples") +
+  ylab("Estimated number of H3\n cases or samples") +
   scale_colour_brewer(palette="Set1",name="Data source")
+p_flunet <- p1/p2
 
-p1/p2
+
+
+## Plots
+p_ili_all
+p_ili_by_age
+p_influenza_cases_age
+p_final
+
+p_flunet

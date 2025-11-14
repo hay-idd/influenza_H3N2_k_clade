@@ -144,7 +144,6 @@ gr_dat_labeled <- gr_dat_labeled %>%
     season == "2024/25" ~ "Recent season",
     season == "2025/26" ~ "Current season",
     TRUE ~ "Other"
-  
   ))
 
 ggplot(gr_dat_labeled) + 
