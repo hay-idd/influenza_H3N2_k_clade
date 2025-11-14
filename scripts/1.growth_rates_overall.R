@@ -166,7 +166,7 @@ p_gr_by_age <- ggplot(tmp_dat_all) +
   scale_color_brewer("Age group", palette = "Set2") +
   xlab("Week") + ylab('Growth rate (per week)') +
   theme_use + facet_wrap(~agegroup,ncol=2) +
-  scale_y_continuous(breaks=seq(-1.2,1.2,by=0.2)) +
+  scale_y_continuous(breaks=seq(-1,1,by=0.2)) +
   coord_cartesian(ylim=c(-1.2,1.2)) +
   theme(legend.position="bottom",legend.direction="horizontal")
 #p_gr_by_age <- add_doubling_axis(p_gr_by_age)
@@ -187,8 +187,8 @@ p_gr_by_age_shifted <- ggplot(tmp_dat_all%>% filter(Season != "2022 to 2023")) +
   scale_color_brewer("Age group", palette = "Set1") +
   xlab("Week (by season)") + ylab('Growth rate (per week)') +
   theme_use + facet_wrap(~agegroup,ncol=2) +
-  #scale_y_continuous(breaks=seq(-1.2,1.2,by=0.2)) +
-  #coord_cartesian(ylim=c(-1.2,1.2)) +
+  scale_y_continuous(breaks=seq(-1,1,by=0.2)) +
+  coord_cartesian(ylim=c(-1.2,1.2)) +
   theme(legend.position="bottom",legend.direction="horizontal")
 #p_gr_by_age_shifted <- add_doubling_axis(p_gr_by_age_shifted)
 
@@ -211,8 +211,8 @@ p_gr_by_age_shifted_rel <- ggplot(tmp_dat_shifted) +
   scale_color_brewer("Age group", palette = "Set1") +
   xlab("Week (by season)") + ylab('Growth rate (per week)') +
   theme_use + facet_wrap(~agegroup,ncol=2) +
-  #scale_y_continuous(breaks=seq(-1.2,1.2,by=0.2)) +
-  #coord_cartesian(ylim=c(-1.2,1.2)) +
+  scale_y_continuous(breaks=seq(-1,1,by=0.2)) +
+  coord_cartesian(ylim=c(-1.2,1.2)) +
   theme(legend.position="bottom",legend.direction="horizontal")
 #p_gr_by_age_shifted_rel <- add_doubling_axis(p_gr_by_age_shifted_rel)
 

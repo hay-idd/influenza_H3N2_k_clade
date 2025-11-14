@@ -226,3 +226,6 @@ p_influenza_cases_age
 p_final
 
 p_flunet
+
+ggsave("figures/raw_data/all_indicators.png",p_final,width=8,height=8,units="in",dpi=300)
+ggsave("figures/raw_data/p_flunet.png",p_flunet,width=8,height=6,units="in",dpi=300)
