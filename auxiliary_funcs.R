@@ -108,3 +108,84 @@ thin_polymod <- function(polymod, age_lower=0, age_upper=20, thin_propn=0.2,
   polymod1
 }
 
+# function to compute weight vector given one holiday interval
+weight_for_hol <- function(dates, start, end, smooth_time) {
+  st <- as.Date(start); en <- as.Date(end)
+  st_buf <- st - smooth_time
+  en_buf <- en + smooth_time
+  # normalized t in [0,1] for transition windows
+  t_before <- pmin(pmax(as.numeric(dates - st_buf) / smooth_time, 0), 1)  # 0 at st_buf -> 1 at st
+  t_after  <- pmin(pmax(as.numeric(dates - en) / smooth_time, 0), 1)      # 0 at en -> 1 at en+smooth_time
+  # easing: eased(t) goes 0 -> 1 smoothly
+  eased_before <- (1 - cos(pi * t_before)) / 2
+  eased_after  <- (1 - cos(pi * t_after)) / 2
+  # weight pieces:
+  # - before window: weight = 1 -> during window (st_buf..st) weight transitions 1 -> 0
+  w_before <- 1 - eased_before    # 1 -> 0 as t_before 0 -> 1
+  # - inside holiday: weight = 0
+  w_inside  <- rep(0, length(dates))
+  # - after window: weight transitions 0 -> 1
+  w_after <- eased_after          # 0 -> 1 as t_after 0 -> 1
+  # assemble: for each date pick the correct piece
+  w <- ifelse(dates >= st & dates <= en, w_inside,
+              ifelse(dates >= st_buf & dates < st, w_before,
+                     ifelse(dates > en & dates <= en_buf, w_after, 1)))
+  as.numeric(w)
+}
+
+
+setup_holiday_tibble <- function(start_date,end_date, half_term_start,half_term_end,winter_holiday_start,winter_holiday_end,  smooth_time = 7){
+  
+  all_days <- tibble(date = seq(start_date, end_date, by = "day"))
+  
+  # label
+  school_days <- all_days %>%
+    mutate(
+      label = case_when(
+        date >= half_term_start   & date <= half_term_end   ~ "half_term",
+        date >= winter_holiday_start & date <= winter_holiday_end ~ "winter_holiday",
+        TRUE ~ "term_time"
+      )
+    )
+  
+  ## Smooths out contact matrix transitions around holidays
+  
+  ## Generate interpolations of contact matrix weightings around holidays
+  # compute weights per holiday and take the minimum (closest holiday dominates)
+  hols <- tibble(
+    start = c(half_term_start, winter_holiday_start),
+    end   = c(half_term_end, winter_holiday_end)
+  )
+  
+  weight_list <- lapply(seq_len(nrow(hols)), function(i) {
+    weight_for_hol(school_days$date, hols$start[i], hols$end[i], smooth_time)
+  })
+  
+  # combine by taking the minimum weight across holidays (so any holiday proximity reduces weight)
+  weights_combined <- Reduce(pmin, weight_list)
+  
+  # append to tibble
+  school_days_weighted <- school_days %>%
+    mutate(weight = weights_combined)
+  school_days_weighted
+}
+
+aggregate_to_groups <- function(ret, age0 = NULL){
+  cols <- c("[0,5)","[5,15)","[15,25)","[25,35)","[35,45)","[45,55)","[55,65)","[65,75)","75+")
+  colnames(ret) <- cols
+  #stopifnot(all(cols %in% colnames(ret)))
+  a05 <- ret[ , "[0,5)"]
+  # compute 1-4: subtract explicit age0 if supplied, otherwise assume uniform -> keep 4/5
+  a1_4 <- if(!is.null(age0)) {
+    stopifnot(length(age0) == nrow(ret))
+    a05 - age0
+  } else a05 * 4/5
+  out <- cbind(
+    `1-4`   = a1_4,
+    `5-14`  = ret[ , "[5,15)"],
+    `15-44` = ret[ , "[15,25)"] + ret[ , "[25,35)"] + ret[ , "[35,45)"],
+    `45-64` = ret[ , "[45,55)"] + ret[ , "[55,65)"],
+    `65+`   = ret[ , "[65,75)"] + ret[ , "75+"]
+  )
+  as.data.frame(out)
+}

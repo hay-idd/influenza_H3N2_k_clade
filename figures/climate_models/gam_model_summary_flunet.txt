@@ -1,0 +1,38 @@
+
+Family: gaussian 
+Link function: identity 
+
+Formula:
+y ~ s(qlogis(prop_of_cumu_cases)) + s(ah_smooth_lag) + time_since_preweek + 
+    Season
+
+Parametric coefficients:
+                    Estimate Std. Error t value Pr(>|t|)    
+(Intercept)        -0.051769   0.022201  -2.332 0.020125 *  
+time_since_preweek -0.005244   0.016421  -0.319 0.749611    
+Season2013/14       0.008976   0.032100   0.280 0.779890    
+Season2014/15      -0.032438   0.050073  -0.648 0.517413    
+Season2015/16       0.061895   0.035785   1.730 0.084346 .  
+Season2016/17       0.113102   0.035825   3.157 0.001695 ** 
+Season2017/18       0.037035   0.034535   1.072 0.284088    
+Season2018/19       0.106435   0.035350   3.011 0.002743 ** 
+Season2019/20      -0.026494   0.038160  -0.694 0.487831    
+Season2020/21       0.195298   0.036714   5.319 1.61e-07 ***
+Season2021/22       0.008033   0.035648   0.225 0.821819    
+Season2022/23       0.058518   0.033568   1.743 0.081934 .  
+Season2023/24       0.113658   0.030907   3.677 0.000262 ***
+Season2024/25       0.073653   0.031202   2.361 0.018651 *  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Approximate significance of smooth terms:
+                                edf Ref.df      F p-value    
+s(qlogis(prop_of_cumu_cases)) 6.943      9 35.204  <2e-16 ***
+s(ah_smooth_lag)              8.518      9  7.617  <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+R-sq.(adj) =  0.618   Deviance explained = 63.9%
+GCV = 0.025608  Scale est. = 0.024114  n = 505
+s(qlogis(prop_of_cumu_cases))              s(ah_smooth_lag)         s(time_since_preweek)                        Season 
+                   0.38799041                    0.08315851                    0.00000000                    0.07469259 

@@ -1,10 +1,26 @@
 #cleaning the digitised data:
 library(dplyr)
 library(ggplot2)
+library(lubridate)
+library(tidyverse)
 #set the path 
-setwd("/Users/palahakoon/Documents/GitHub/influenza_H3N2_k_clade/data/rcgp_digitised/raw_data")
+#setwd("/Users/palahakoon/Documents/GitHub/influenza_H3N2_k_clade/data/rcgp_digitised/raw_data")
+setwd("~/Documents/GitHub/influenza_H3N2_k_clade/data/rcgp_digitised/raw_data")
 
-
+get_flu_season <- function(date) {
+  # Ensure input is a Date
+  date <- as.Date(date)
+  
+  year <- as.integer(format(date, "%Y"))
+  month <- as.integer(format(date, "%m"))
+  
+  # Flu season starts in July and ends in June next year
+  start_year <- ifelse(month >= 7, year, year - 1)
+  end_year <- start_year + 1
+  
+  # Return formatted season label
+  paste0(start_year, "–", end_year)
+}
 
 clean_digitised_data<-function(data,n_start_week){
   # Define start and end dates
@@ -78,9 +94,16 @@ all_clean_dat<-rbind(all_clean_dat,clean_dat_4)
 
 colnames(all_clean_dat)[colnames(all_clean_dat) == "y_axis"] <- "percent_positive_samples_H3"
 
-ggplot(all_clean_dat,aes(x=Date,y=percent_positive_samples_H3))+
-  geom_point()+
-  facet_grid(~age_group)
+all_clean_dat %>% complete(Date = seq.Date(min(Date), max(Date), by="week"), age_group) %>%
+  arrange(age_group, Date) %>%
+  mutate(percent_positive_samples_H3 = ifelse(is.na(percent_positive_samples_H3), 0, percent_positive_samples_H3)) -> all_clean_dat
+
+all_clean_dat$season <- get_flu_season(all_clean_dat$Date)
+
+all_clean_H3 <- all_clean_dat
+ggplot(all_clean_H3,aes(x=Date,y=percent_positive_samples_H3,group=season,col=season))+
+  geom_line()+
+  facet_wrap(~age_group,ncol=1)
 
 #save the data
 write_csv(all_clean_dat,"/Users/palahakoon/Documents/GitHub/influenza_H3N2_k_clade/data/rcgp_digitised/clean_data/percent_positive_samples_H3_by_age.csv")
@@ -112,7 +135,7 @@ clean_dat_3<-clean_digitised_data(data_3,k)
 clean_dat_3$age_group<-rep("19to64")
 all_clean_dat<-rbind(all_clean_dat,clean_dat_3)
 
-data_4<-read.csv("65_over_1.csv",header=F)
+data_4<-read.csv("65_over_2.csv",header=F)
 k<-5
 clean_dat_4<-clean_digitised_data(data_4,k)
 clean_dat_4$age_group<-rep("65_over")
@@ -121,10 +144,17 @@ all_clean_dat<-rbind(all_clean_dat,clean_dat_4)
 
 colnames(all_clean_dat)[colnames(all_clean_dat) == "y_axis"] <- "number_of_influenza_samples"
 
-ggplot(all_clean_dat,aes(x=Date,y=number_of_influenza_samples))+
-  geom_point()+
-  facet_grid(~age_group)
+all_clean_dat %>% complete(Date = seq.Date(min(Date), max(Date), by="week"), age_group) %>%
+  arrange(age_group, Date) %>%
+  mutate(number_of_influenza_samples = ifelse(is.na(number_of_influenza_samples), 0, number_of_influenza_samples)) -> all_clean_dat
 
+all_clean_dat$season <- get_flu_season(all_clean_dat$Date)
+
+
+
+ggplot(all_clean_dat,aes(x=Date,y=number_of_influenza_samples,group=season))+
+  geom_line()+
+  facet_wrap(~age_group,ncol=1)
 
 #save the data
 write_csv(all_clean_dat,"/Users/palahakoon/Documents/GitHub/influenza_H3N2_k_clade/data/rcgp_digitised/clean_data/number_of_influenza_samples_by_age.csv")
