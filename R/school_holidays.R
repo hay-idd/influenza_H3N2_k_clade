@@ -4,13 +4,13 @@ library(dplyr)
 # helper: Monday on/after a date
 next_monday_on_or_after <- function(date) {
   date <- as.Date(date)
-  w <- wday(date, week_start = 1)
+  w <- lubridate::wday(date, week_start = 1)
   date + ((1 - w) %% 7)
 }
 # helper: Monday on/before a date
 prev_monday_on_or_before <- function(date) {
   date <- as.Date(date)
-  w <- wday(date, week_start = 1)
+  w <- lubridate::wday(date, week_start = 1)
   date - ((w - 1) %% 7)
 }
 # compute Easter (Meeus algorithm) for given year (Gregorian)
