@@ -194,12 +194,12 @@ break
 #y_base <- epi_ode_size(C_use, beta_par, gamma, N, ts=seq(1,365,by=1),
  #                      alphas=alphas, age_seed=4,immunity_seed=1,return_compartments=TRUE)
 
-parTab <- data.frame(values=c(0.7,0.7,0.7,0.7,1.1,0.0005,log(20),3),
-                     names=c("prop_immune_younger","prop_immune_younger2","prop_immune_older","prop_immune_oldest","alpha1","reporting_rate","seed_size","obs_sd"),
-                     fixed=c(0,0,0,0,1,0,0,1),
-                     lower_bound=c(0,0,0,0,1,0,0,0),
-                     upper_bound=c(1,1,1,1,2,0.01,log(10000),10),
-                     steps=c(0.1,0.1,0.1,0.1,0.1,0.0001,0.1,0.1),
+parTab <- data.frame(values=c(0.7,0.7,0.7,0.7,1.1,0.0005,log(20),3,1.2),
+                     names=c("prop_immune_younger","prop_immune_younger2","prop_immune_older","prop_immune_oldest","alpha1","reporting_rate","seed_size","obs_sd","R0"),
+                     fixed=c(0,0,0,0,1,0,0,1,0),
+                     lower_bound=c(0,0,0,0,1,0,0,0,1),
+                     upper_bound=c(1,1,1,1,2,0.01,log(10000),10,10),
+                     steps=c(0.1,0.1,0.1,0.1,0.1,0.0001,0.1,0.1,0.1),
                      stringsAsFactors=FALSE)
 
 my_prior <- function(pars){
