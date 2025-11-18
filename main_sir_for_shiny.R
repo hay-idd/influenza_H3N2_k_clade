@@ -28,23 +28,24 @@ prop_work_contacts_in_hols <- 0.4
 prop_home_contacts_in_hols <- 2
 
 ## Proportion of 0-4 year olds in the immune category
-prop_immune_younger <- 0.5
+prop_immune_younger <- 0
 ## Proportion of 5-14 year olds in the immune category
 prop_immune_younger2 <- 0.5
 ## Proportion of 15-64 year olds in the immune category
-prop_immune_older <- 0.7
+prop_immune_older <- 0.9
 ## Proportion of 65+ year olds in the immune category
-prop_immune_oldest <- 0.7
+prop_immune_oldest <- 0.9
 
-## Relative susceptability of the two immune classes
-alphas <- c(1.2,1)
+## Relative susceptibility of the two immune classes
+## First index is susceptible, second index is immune
+alphas <- c(1,0.5)
 
 ## Basic reproductive number
-R0 <- 1.2
+R0 <- 1.8
 ## Infectious period mean
 gamma <- 3
 ## Number of seed viruses as of 2023-09-01
-seed_size <- 200
+seed_size <- 1000
 
 ## Proportion of infections leading to symptoms by age group
 ## https://www.thelancet.com/journals/langlo/article/PIIS2214-109X(21)00141-8/fulltext
@@ -155,7 +156,6 @@ y_base <- y_base %>% mutate(compartment = str_split(name, "_", simplify=TRUE)[,1
                             immunity = as.integer(str_split(name, "_", simplify=TRUE)[,3]))
 total_inf <- y_base %>% filter(time == max(time),compartment == "inc")  %>% pull(value) %>% sum()
 
-print(total_inf/sum(N))
 
 inc <- y_base %>% filter(compartment == "inc")
 inc <- inc %>% group_by(age, immunity) %>% mutate(value = value - lag(value, 1))
@@ -178,16 +178,20 @@ inc <- inc %>% left_join(symp_frac_dat)
 
 date_key <- data.frame(time=ts,date=as.Date("2023-09-01") + ts-1)
 
+percent_infected <- total_inf/sum(N)
 
-ggplot(inc %>% ungroup() %>% 
+
+p <- ggplot(inc %>% ungroup() %>% 
          #mutate(value = value/max(value,na.rm=TRUE)) %>%
          mutate(value = value*symp_frac*reporting_rate) %>%
          
          left_join(date_key)) + geom_line(aes(x=date,y=value,col=age.group)) + scale_color_viridis_d() +
   geom_vline(xintercept= c(half_term_start,half_term_end,winter_holiday_start,winter_holiday_end), linetype="dashed", color = "red") +
   scale_x_date(breaks="1 month") +
+  ggtitle(paste0("Final size: ",signif(percent_infected,3)))+
   theme_bw() +
   xlab("Date") +
   ylab("Reported symptomatic cases (daily)")
 
 print(total_inf/sum(N))
+print(p)

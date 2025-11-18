@@ -72,13 +72,14 @@ date_seq <- seq(start_date,end_date,by="1 day")
 ts <- seq(start_day,end_day,by=1) - start_day + 1
 
 inc_dat <- read_csv("data/final/ili_plus_datasets_by_age.csv")
+inc_dat <- read_csv("data/final/flunet_h3_cases_historic.csv")
 inc_dat_subset <- inc_dat %>% filter(group != "All",Season == "2023 to 2024") %>% select(date,group, ILIplus) %>% filter(date >= start_date, date <=end_date)
 ggplot(inc_dat_subset) + geom_line(aes(x=date,y=ILIplus,col=group))
 inc_dat_wide <- inc_dat_subset %>% pivot_wider(names_from=group, values_from=ILIplus) %>% select(-date)
 ########################################################
 ## SETUP MODEL FOR 2023/24 SEASON
 ########################################################
-R0 <- 1.2
+R0 <- 1.8
 gamma <- 3
 
 ## https://www.thelancet.com/journals/langlo/article/PIIS2214-109X(21)00141-8/fulltext
@@ -115,6 +116,8 @@ prop_immune_younger2 <- 0.5
 prop_immune_older <- 0.7
 prop_immune <- c(prop_immune_younger,prop_immune_younger2, rep(prop_immune_older,7))
 beta_scales <- rep(1, N_age_classes)
+
+## First index is susceptible, second index is immune
 alphas <- c(1.2,1)
 
 N_props_long <- c(N_props*(1-prop_immune), N_props*(prop_immune))  ## Number of people in each age group and age class
@@ -194,11 +197,11 @@ break
 #y_base <- epi_ode_size(C_use, beta_par, gamma, N, ts=seq(1,365,by=1),
  #                      alphas=alphas, age_seed=4,immunity_seed=1,return_compartments=TRUE)
 
-parTab <- data.frame(values=c(0.7,0.7,0.7,0.7,1.1,0.0005,log(20),3,1.2),
+parTab <- data.frame(values=c(0.7,0.7,0.7,0.7,0.5,0.0005,log(20),3,2),
                      names=c("prop_immune_younger","prop_immune_younger2","prop_immune_older","prop_immune_oldest","alpha1","reporting_rate","seed_size","obs_sd","R0"),
-                     fixed=c(0,0,0,0,1,0,0,1,0),
-                     lower_bound=c(0,0,0,0,1,0,0,0,1),
-                     upper_bound=c(1,1,1,1,2,0.01,log(10000),10,10),
+                     fixed=c(0,0,0,0,0,0,0,1,1),
+                     lower_bound=c(0,0,0,0,0,0,0,0,1),
+                     upper_bound=c(1,1,1,1,1,0.01,log(10000),10,10),
                      steps=c(0.1,0.1,0.1,0.1,0.1,0.0001,0.1,0.1,0.1),
                      stringsAsFactors=FALSE)
 
@@ -207,7 +210,7 @@ my_prior <- function(pars){
   b <- dbeta(pars["prop_immune_younger2"],2,1.5,1)
   c <- dbeta(pars["prop_immune_older"],10,6,1)
   d <- dbeta(pars["prop_immune_oldest"],10,6,1)
-  e <- dlnorm(pars["alpha1"],log(1.2),0.05,1)
+  e <- dbeta(pars["alpha1"],1,1,1)
   f <- dunif(pars["reporting_rate"], 0, 0.01) #dbeta(pars["reporting_rate"],2,1000,1)
   g <- dnorm(pars["seed_size"],log(50),2,1)
   tot_prior <- a + b + c + d + e + f + g
@@ -237,7 +240,7 @@ posterior_func <- function(parTab, data, PRIOR_FUNC, return_dat=FALSE,aggregate=
     prop_immune_older <- pars[3]
     prop_immune_oldest <- pars[4]
     prop_immune <- c(prop_immune_younger,prop_immune_younger2, rep(prop_immune_older,5),prop_immune_oldest,prop_immune_oldest)
-    alphas <- c(pars[5],1)
+    alphas <- c(1,pars[5])
     reporting_rate <- pars[6]
     seed_size <- exp(pars[7])
     
@@ -316,7 +319,7 @@ startTab <- parTab
 startTab$values <- bestPars
 output2 <- run_MCMC(startTab, NULL, mcmcPars, filename="test", posterior_func, mvrPars, PRIOR_FUNC = my_prior  ,0.2)
 chain <- read.csv(output2$file)
-#plot(coda::as.mcmc(chain[chain$sampno > mcmcPars["adaptive_period"],]))
+plot(coda::as.mcmc(chain[chain$sampno > mcmcPars["adaptive_period"],]))
 bestPars <- get_best_pars(chain)
 
 pred <- as.data.frame(model_func(bestPars,TRUE,TRUE))
@@ -330,7 +333,7 @@ pred_long$name <- factor(pred_long$name, levels=c("1-4","5-14", "15-44","45-64",
 
 ggplot(pred_long) + 
   geom_line(aes(x=date,y=value,col="Pred")) +
-  geom_line(data=plot_dat_long, aes(x=date,y=value,col="Data")) +
+  #geom_line(data=plot_dat_long, aes(x=date,y=value,col="Data")) +
   facet_wrap(~name)
 
 
