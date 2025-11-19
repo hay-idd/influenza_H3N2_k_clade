@@ -122,7 +122,8 @@ server <- function(input, output, session) {
   end_date <- as.Date("2023-06-01")
   half_term_start <- as.Date("2022-10-21")
   half_term_end <- as.Date("2022-10-30")
-  christmas_start <- as.Date("2022-12-01")
+  shopping_period_start <- as.Date("2022-12-01")
+  shopping_period_end <- as.Date("2022-12-15")
   winter_holiday_start <- as.Date("2022-12-21")
   winter_holiday_end <- as.Date("2023-01-04")
   N_tot <- 60000000
@@ -456,7 +457,7 @@ server <- function(input, output, session) {
            
            meta = list(start_date = start_date, end_date = end_date,
                        half_term_start = half_term_start, half_term_end = half_term_end,
-                       christmas_start = christmas_start,
+                       shopping_period_start = shopping_period_start,
                        winter_holiday_start = winter_holiday_start, winter_holiday_end = winter_holiday_end,
                        y_lim_max=input$y_lim_max))
     }, error = function(e) {
@@ -508,7 +509,7 @@ server <- function(input, output, session) {
       geom_line(aes(x = date, y = incidence, col = age_group,linetype="Model"),linewidth=1) +
       scale_color_brewer("Age group",palette="Set1") +
       scale_linetype_manual("Source",values=c("2023/23 season data"="dashed","Model"="solid")) +
-      geom_vline(xintercept = c(half_term_start, half_term_end,christmas_start, winter_holiday_start, winter_holiday_end),
+      geom_vline(xintercept = c(half_term_start, half_term_end,shopping_period_start, winter_holiday_start, winter_holiday_end),
                  linetype = "dashed", color = "red") +
       scale_x_date(breaks = "1 month") +
       coord_cartesian(ylim=c(0,res$meta$y_lim_max),xlim=c(as.Date("2022-09-01"),end_date)) +
@@ -606,7 +607,7 @@ server <- function(input, output, session) {
       half_term_end   <- res$meta$half_term_end
       winter_holiday_start <- res$meta$winter_holiday_start
       winter_holiday_end   <- res$meta$winter_holiday_end
-      christmas_start <- res$meta$christmas_start
+      shopping_period_start <- res$meta$shopping_period_start
       
       inc <- as.data.frame(res$inc)
       inc$t <- 1:nrow(inc)
@@ -627,7 +628,7 @@ server <- function(input, output, session) {
         geom_line(aes(x=date,y=incidence,col=age_group,linetype="Model"),linewidth=1) +
         scale_color_brewer("Age group",palette="Set1") +
         scale_linetype_manual("Source",values=c("2023/23 season data"="dashed","Model"="solid")) +
-        geom_vline(xintercept=c(half_term_start,half_term_end,christmas_start,winter_holiday_start,winter_holiday_end),
+        geom_vline(xintercept=c(half_term_start,half_term_end,shopping_period_start,winter_holiday_start,winter_holiday_end),
                    linetype="dashed",color="red") +
         scale_x_date(breaks="1 month") +
         coord_cartesian(ylim=c(0,input$y_lim_max),xlim=c(as.Date("2022-09-01"),end_date)) +

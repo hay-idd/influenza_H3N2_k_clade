@@ -136,12 +136,13 @@ weight_for_hol <- function(dates, start, end, smooth_time) {
 
 setup_holiday_tibble <- function(start_date,end_date, half_term_start,half_term_end,winter_holiday_start,winter_holiday_end,  smooth_time = 7){
   
+  
   all_days <- tibble(date = seq(start_date, end_date, by = "day"))
   
   # label
   school_days <- all_days %>%
     mutate(
-      label = case_when(
+      label = dplyr::case_when(
         date >= half_term_start   & date <= half_term_end   ~ "half_term",
         date >= winter_holiday_start & date <= winter_holiday_end ~ "winter_holiday",
         TRUE ~ "term_time"
