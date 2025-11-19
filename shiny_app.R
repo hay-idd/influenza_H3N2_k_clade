@@ -72,7 +72,7 @@ ui <- fluidPage(
 
 # Server ----
 server <- function(input, output, session) {
-  
+
   # Reactive values for fixed dates and baseline constants copied from your script:
   start_date <- as.Date("2023-09-01")
   end_date <- as.Date("2024-05-01")
@@ -89,6 +89,22 @@ server <- function(input, output, session) {
   data("polymod")
   contacts_all <- polymod$contacts
   polymod_base <- polymod
+  
+  # read input parameters
+  prop_work_contacts_in_hols <-0.4
+  prop_home_contacts_in_hols <- 2
+  
+  prop_immune_younger <- 0.5
+  prop_immune_younger2 <- 0.5
+  prop_immune_older <- 0.5
+  prop_immune_oldest <- 0.5
+  
+  alphas <- c(1,0.5)
+  R0 <- 2
+  gamma <-3
+  seed_size <- 200
+  reporting_rate <- 0.001
+  
   
   # Reactive wrapper that runs when the button is clicked or inputs change:
   run_model <- eventReactive(input$run_model, {

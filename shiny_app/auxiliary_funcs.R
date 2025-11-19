@@ -172,7 +172,8 @@ setup_holiday_tibble <- function(start_date,end_date, half_term_start,half_term_
 
 setup_period_tibble <- function(start_date, end_date, ..., smooth_time = 7, period_names = NULL) {
   dates <- seq(as.Date(start_date), as.Date(end_date), by = "day")
-  pts   <- as.Date(unlist(list(...)))
+  pts   <- unlist(list(...))
+  if (!inherits(pts, "Date")) pts <- as.Date(pts, origin = "1970-01-01")  # handles numeric safely
   if (length(pts) == 0) return(tibble::tibble(date = dates, label = "term_time", weight = 1))
   starts <- pts[seq(1, length(pts), 2)]
   ends   <- pts[seq(2, length(pts), 2)]

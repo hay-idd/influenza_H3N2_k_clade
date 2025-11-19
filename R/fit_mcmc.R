@@ -23,38 +23,39 @@ half_term_end <- as.Date("2022-10-30")
 winter_holiday_start <- as.Date("2022-12-15")
 winter_holiday_end <- as.Date("2023-01-04")
 
+
 ## Proportion of work contacts kept during the school holidays
 prop_work_contacts_in_hols <- 0.5
 ## Increase in at-home contacts during the holidays
 prop_home_contacts_in_hols <- 1.5
 
-## Proportion of 0-4 year olds in the immune category
-prop_immune_younger <- 0.5
-## Proportion of 5-14 year olds in the immune category
-prop_immune_younger2 <- 0.8
-## Proportion of 15-64 year olds in the immune category
-prop_immune_older <- 0.9
-## Proportion of 65+ year olds in the immune category
-prop_immune_oldest <- 0.9
+parTab <- data.frame(values=c(0.7,0.7,0.8,0.7,
+                              0.5,0.001,
+                              log(20),3,2,
+                              0.5,0.4,0.5,0.6),
+                     names=c("prop_immune_youngest","prop_immune_younger","prop_immune_older","prop_immune_oldest",
+                             "alpha1","reporting_rate",
+                             "seed_size","obs_sd","R0",
+                             "symp1","symp2","symp3","symp4"),
+                     fixed=c(0,0,1,0,
+                             0,0,
+                             0,0,0, 
+                             0,0,1,0),
+                     lower_bound=c(0,0,0,0,
+                                   0,0,0,
+                                   0,1,
+                                   0,0,0,0),
+                     upper_bound=c(1,1,1,1,
+                                   1,0.01,log(10000),
+                                   50,10,
+                                   1,1,1,1),
+                     steps=c(0.1,0.1,0.1,0.1,
+                             0.1,0.0001,0.1,
+                             0.1,0.1,
+                             0.1,0.1,0.1,0.1),
+                     stringsAsFactors=FALSE)
 
-## Relative susceptibility of the two immune classes
-## First index is susceptible, second index is immune
-alphas <- c(1,0.55)
-
-## Basic reproductive number
-R0 <- 2
-## Infectious period mean
-gamma <- 3
-## Number of seed viruses as of 2023-09-01
-seed_size <- 1000
-
-## Proportion of infections leading to symptoms by age group
-## https://www.thelancet.com/journals/langlo/article/PIIS2214-109X(21)00141-8/fulltext
-#symp_frac <- c(0.75,0.5,0.4,0.4,0.4,0.5,0.5,0.75,0.75)
 symp_frac <- c(0.5,0.4,0.5,0.6)
-## Proportion of symptomatic cases reported
-reporting_rate <- 0.1
-
 
 ## Demography data
 ## Population of England
@@ -63,10 +64,8 @@ N_tot <- 60000000
 ########################################################
 ## CREATE CONTACT MATRICES
 ########################################################
-
 ## POLYMOD contact matrix
 data("polymod")
-
 contacts <- polymod$contacts
 ## Create new contact survey with no school contacts, decreased work contacts, and increased home contacts
 contacts_no_schools <- contacts %>% filter(cnt_school == 0, cnt_work == 0, cnt_home==0)# & cnt_leisure == 0)
@@ -110,20 +109,22 @@ start_day <- as.numeric(start_date)
 end_day <- as.numeric(end_date)
 date_seq <- seq(start_date,end_date,by="1 day")
 ts <- seq(start_day,end_day,by=1) - start_day + 1
-
+flu_dat <-  flu_dat %>% filter(date >= start_date,date<=end_date)
+flu_dat_wide <- flu_dat %>% filter(date >= start_date,date<=end_date) %>%
+  select(date, age_group,ILI_flu) %>% pivot_wider(names_from=age_group,values_from=ILI_flu)
+  
 ########################################################
 ## SETUP MODEL FOR 2023/24 SEASON
 ########################################################
 
 ## From https://www.kennedycollegeoxford.org.uk/term-dates
 ## Holiday dates
-
+## Setup contact matrix list
 school_days_weighted <- setup_holiday_tibble(start_date,end_date, half_term_start,half_term_end,
                                              winter_holiday_start,winter_holiday_end, smooth_time = 7)
-#prop_immune <- c(prop_immune_younger,prop_immune_younger2, rep(prop_immune_older,5), prop_immune_oldest,prop_immune_oldest)
 prop_immune <- c(prop_immune_younger,prop_immune_younger2,prop_immune_older,prop_immune_oldest)
 ## Setup population proportions
-N_props <- polymod_c_term$participants$proportion
+N_props <- polymod_c_term$demography$proportion
 N_age_classes <- length(N_props)
 N_immunity_classes <- 2
 
@@ -145,10 +146,109 @@ for(i in 1:nrow(school_days_weighted)){
   C_list[[i]] <- C_use_term*school_days_weighted$weight[i] + C_use_holiday*(1 - school_days_weighted$weight[i])
 }
 
-## Trial run
-y_base <- epi_ode_size(C_list, beta_par, gamma, N, ts=ts,
-                       alphas=alphas, age_seed=4,immunity_seed=1,seed_size=seed_size,return_compartments=TRUE)
-use_cols <- which(colnames(y_base) %like% "inc")
+
+f <- posterior_func(parTab, data=flu_dat_wide, PRIOR_FUNC=my_prior,
+                    #symp_frac=symp_frac, 
+                    N_props=N_props,C_term=C_term, C_list=C_list,return_dat=FALSE)
+
+f(parTab$values)
+model_f <- posterior_func(parTab, data=flu_dat_wide, PRIOR_FUNC=NULL,
+                          #symp_frac=symp_frac, 
+                          N_props=N_props,C_term=C_term, C_list=C_list,return_dat=TRUE)
+tmp_dat <- model_f(parTab$values)
+tmp_dat$t <- 1:nrow(tmp_dat)
+p1 <- tmp_dat %>% pivot_longer(-t) %>% ggplot() + geom_line(aes(x=t,y=value,col=name))
+p2 <- flu_dat %>% ggplot() + geom_line(aes(x=floor(as.numeric(date-min(date))/7),y=ILI_flu,col=age_group))
+p1/p2
+
+##### RUN MCMC UNIVARIATE CHAIN
+mcmcPars <- c("iterations"=50000,"popt"=0.44,"opt_freq"=1000,
+              "thin"=1,"adaptive_period"=50000,"save_block"=1000)
+
+
+output <- run_MCMC(parTab, data=flu_dat_wide,
+                  #symp_frac=symp_frac, 
+                   N_props=N_props,C_term=C_term, C_list=C_list,return_dat=FALSE,
+                   mcmcPars=mcmcPars, filename="test", 
+                   CREATE_POSTERIOR_FUNC=posterior_func, mvrPars=NULL, 
+                   PRIOR_FUNC = my_prior, OPT_TUNING=0.2)
+chain <- read.csv(output$file)
+plot(coda::as.mcmc(chain[chain$sampno > mcmcPars["adaptive_period"],]))
+
+bestPars <- get_best_pars(chain)
+## Calculate the covariance matrix of the model parameters from the 
+## previous MCMC chain. Need to exclude the first and last column
+chain <- chain[chain$sampno >= mcmcPars["adaptive_period"],2:(ncol(chain)-1)]
+covMat <- cov(chain)
+mvrPars <- list(covMat,0.2, w=0.8)#2.38/sqrt(nrow(parTab[parTab$fixed==0,])),w=0.8)
+
+startTab <- parTab
+startTab$values <- bestPars
+
+mcmcPars <- c("iterations"=5000,"popt"=0.44,"opt_freq"=1000,
+              "thin"=1,"adaptive_period"=5000,"save_block"=1000)
+output2 <- run_MCMC(parTab, data=flu_dat_wide,
+         #symp_frac=symp_frac, 
+         N_props=N_props,C_term=C_term, C_list=C_list,return_dat=FALSE,
+         mcmcPars=mcmcPars, filename="test", 
+         CREATE_POSTERIOR_FUNC=posterior_func, mvrPars=mvrPars, 
+         PRIOR_FUNC = my_prior, OPT_TUNING=0.2)
+chain <- read.csv(output2$file)
+
+create_prediction_intervals <- function(chain,model_f,nsamp=100){
+  samps <- sample(1:nrow(chain), nsamp)
+  tmp_preds <- NULL
+  for(i in seq_along(samps)){
+    tmp_pars <- get_index_pars(chain, samps[i])
+    tmp_pred <- as.data.frame(model_f(tmp_pars))
+    tmp_pred$date <- date_seq[seq(1,length(date_seq),by=7)]
+    tmp_pred <- tmp_pred %>% pivot_longer(-date)
+    #tmp_pred$name <- factor(tmp_pred$name, levels=c("1-4","5-14", "15-44","45-64","65+"))
+    tmp_pred$value <- rpois(nrow(tmp_pred),tmp_pred$value)
+    tmp_pred$samp_no <- samps[i]
+    tmp_preds[[i]] <- tmp_pred
+  }
+  tmp_preds <- do.call("bind_rows",tmp_preds)
+  tmp_preds
+}
+pred_intervals <- create_prediction_intervals(chain,model_f, 100)
+pred_intervals <- pred_intervals %>%
+  group_by(date,name) %>%
+  summarize(lower=quantile(value,0.025),
+            upper=quantile(value,0.975),
+            median=quantile(value,0.5))
+
+age_key <- c("inc_1_1"="0-4",
+             "inc_2_1"="5-18",
+             "inc_3_1"="19-64",
+             "inc_4_1"="65+")
+pred_intervals$age_group <- age_key[pred_intervals$name]
+
+ggplot(pred_intervals) + 
+  geom_ribbon(aes(x=date,ymin=lower,ymax=upper),alpha=0.5) +
+  geom_line(data=flu_dat,aes(x=date,y=ILI_flu)) +
+  # geom_line(data=pred_long,aes(x=date,y=value,col="Pred")) +
+  #geom_line(data=plot_dat_long, aes(x=date,y=value,col="Data")) +
+  facet_wrap(~age_group)
+
+
+p <- ggplot(inc %>% ungroup() %>% 
+              #mutate(value = value/max(value,na.rm=TRUE)) %>%
+              mutate(value = value*symp_frac*reporting_rate) %>%
+              
+              left_join(date_key)) + geom_line(aes(x=date,y=value,col=age.group)) + scale_color_viridis_d() +
+  geom_vline(xintercept= c(half_term_start,half_term_end,winter_holiday_start,winter_holiday_end), linetype="dashed", color = "red") +
+  scale_x_date(breaks="1 month") +
+  ggtitle(paste0("Final size: ",signif(percent_infected,3)))+
+  theme_bw() +
+  xlab("Date") +
+  ylab("Reported symptomatic cases (daily)")
+
+
+
+
+
+
 
 #rt <- y_base %>% select(time,Rt)
 #ggplot(rt) + geom_line(aes(x=time,y=Rt))
@@ -176,7 +276,7 @@ inc <- inc %>% group_by(age.group,time) %>% summarize(value = sum(value)) %>% gr
 symp_frac_rep <- rep(symp_frac,each=2)
 symp_frac_dat <- data.frame(#age.group=c("[0,5)", "[5,15)", "[15,25)", "[25,35)", "[35,45)", "[45,55)","[55,65)", "[65,75)", "75+"),
   age.group = c("[0,5)","[5,18)","[18,65)","65+"),
-                            symp_frac=symp_frac)
+  symp_frac=symp_frac)
 
 
 inc <- inc %>% left_join(symp_frac_dat)
@@ -188,10 +288,10 @@ inc$age.group <- factor(inc$age.group,levels=c("[0,5)","[5,18)","[18,65)","65+")
 
 
 p <- ggplot(inc %>% ungroup() %>% 
-         #mutate(value = value/max(value,na.rm=TRUE)) %>%
-         mutate(value = value*symp_frac*reporting_rate) %>%
-         
-         left_join(date_key)) + geom_line(aes(x=date,y=value,col=age.group)) + scale_color_viridis_d() +
+              #mutate(value = value/max(value,na.rm=TRUE)) %>%
+              mutate(value = value*symp_frac*reporting_rate) %>%
+              
+              left_join(date_key)) + geom_line(aes(x=date,y=value,col=age.group)) + scale_color_viridis_d() +
   geom_vline(xintercept= c(half_term_start,half_term_end,winter_holiday_start,winter_holiday_end), linetype="dashed", color = "red") +
   scale_x_date(breaks="1 month") +
   ggtitle(paste0("Final size: ",signif(percent_infected,3)))+
