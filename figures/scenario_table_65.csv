@@ -1,0 +1,12 @@
+"","Scenario","cum_65","ratio_to_base"
+"1","A. Base case (loosely based on the 2022/23 season)",4230110,1
+"2","B. Earlier seeding",3095860,0.732
+"3","C. Moderate immune escape",4665470,1.103
+"4","D. Severe immune escape",4862190,1.149
+"5","E. Moderately higher transmissibility",4423940,1.046
+"6","F. Severely higher transmissibility",4318960,1.021
+"7","G. Moderate immune escape and earlier seeding",3813920,0.902
+"8","H. Increased immune escape in younger ages",4362400,1.031
+"9","I. Increased mixing in the Christmas period",4992390,1.18
+"10","J. Moderate immune escape + earlier seeding
+ + higher transmissibility",4021490,0.951
