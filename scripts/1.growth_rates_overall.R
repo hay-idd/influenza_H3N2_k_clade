@@ -699,7 +699,7 @@ gr_flunet_dat <- gr_flunet_dat %>%
 
 
 
-p_gr_flunet <- ggplot(data=gr_flunet_dat) + 
+p_gr_flunet_all <- ggplot(data=gr_flunet_dat) + 
   geom_hline(yintercept=0,linetype="dashed") +
   geom_ribbon(aes(x=date,ymin=lb_50,ymax=ub_50,group=season),alpha=0.25,fill="blue") +
   geom_ribbon(aes(x=date,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
@@ -764,7 +764,7 @@ p_gr_flunet_by_peak <- ggplot(data=gr_flunet_dat %>% filter(day_shifted <= 100, 
   theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
 
-p_gr_flunet <- add_doubling_axis(p_gr_flunet)
+p_gr_flunet_all <- add_doubling_axis(p_gr_flunet_all)
 p_gr_flunet_by_day <- add_doubling_axis(p_gr_flunet_by_day)
 p_gr_flunet_by_peak <- add_doubling_axis(p_gr_flunet_by_peak)
 
@@ -930,4 +930,7 @@ p_gr_cases <- ggplot(data=gr_case_dat %>% filter(!(season %in% c("2020/21","2021
 ggsave("figures/growth_rates/ukhsa_h3_flu_growth_rate.png",p_gr_cases,width=7,height=4)
 write_csv(gr_case_dat,"results/ukhsa_h3_flu_growth_rates.csv")
 
-
+p_gr_flunet
+p_gr_flunet_all
+p_gr_cases
+p_gr_cases_all

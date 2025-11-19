@@ -79,8 +79,8 @@ ui <- fluidPage(
     tabPanel("Model",
              sidebarLayout(
                sidebarPanel(
-                 downloadButton("download_plot", "Download Plot (PNG)"),
-                 downloadButton("download_table", "Download Table (CSV)"),
+                 downloadButton("download_plot", "Download Plot (zip)"),
+                 downloadButton("download_table", "Download Table (csv)"),
                  hr(),
                  h4("Plot settings"),
                  numericInput("y_lim_max", "Maximum y-axis value", value = defaults$y_lim_max, step = 100),
@@ -622,7 +622,10 @@ server <- function(input, output, session) {
   
   # ---- Download handlers ----
   output$download_plot <- downloadHandler(
-    filename = function() paste0("model_plot_", Sys.Date(), ".png"),
+    filename = function() {
+      paste0("model_plot_and_data_", Sys.Date(), ".zip")
+    },
+    #filename = function() paste0("model_plot_", Sys.Date(), ".png"),
     content = function(file) {
       res <- run_model()
       if (isTRUE(res$error)) stop("Model error: ", res$message)
@@ -640,7 +643,7 @@ server <- function(input, output, session) {
       rects <- data.frame(
         xmin = as.Date(c(half_term_start, shopping_period_start, winter_holiday_start)),
         xmax = as.Date(c(half_term_end,   shopping_period_end,   winter_holiday_end)),
-        label = c("Half term", "Christmas period (pre holidays)", "Christmas holidays"),
+        label = c("Half term", "Christmas period\n (pre holidays)", "Christmas\n holidays"),
         fill  = c("Half term", "Christmas period (pre holidays)", "Christmas holidays"),
         stringsAsFactors = FALSE
       )
@@ -695,8 +698,30 @@ server <- function(input, output, session) {
                         hjust = 1, vjust = 1, size = 3.5, fontface = "bold",
                         fill = "white", alpha = 0.8)
       
-      ggsave(file, plot = p, width = 12, height = 6, dpi = 300)
-    }
+      # prepare a short-named temp dir so zip contains top-level files
+      tmpdir <- tempfile("model_plot_zip")
+      dir.create(tmpdir)
+      oldwd <- setwd(tmpdir)
+      on.exit({
+        setwd(oldwd)
+        unlink(tmpdir, recursive = TRUE, force = TRUE)
+      }, add = TRUE)
+      
+      # filenames that will appear at the root of the zip
+      png_name  <- "model_plot.png"
+      rdata_name <- "model_plot_data.RData"
+      
+      # save PNG and RData into tmpdir (short names)
+      ggsave(filename = png_name, plot = p, width = 12, height = 6, dpi = 300)
+      
+      plot_data <- inc %>% left_join(date_key)
+      save(plot = p, plot_data, flu_dat1, res, file = rdata_name)
+      
+      # create the zip at the requested 'file' path; include only the basenames so they are top-level
+      utils::zip(zipfile = file, files = c(png_name, rdata_name))
+      
+      # tmpdir and its contents are removed by on.exit above
+      }
   )
   
   output$download_table <- downloadHandler(
