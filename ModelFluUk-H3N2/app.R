@@ -35,8 +35,6 @@ data("polymod")
 contacts_all <- polymod$contacts
 polymod_base <- polymod
 
-flu_dat <- read_csv("data/final/flu_2022_2023.csv")
-
 # ---- Single source of defaults (edit here to change UI defaults) ----
 defaults <- list(
   y_lim_max = 4000,
@@ -65,6 +63,7 @@ defaults <- list(
   symp_4 = 0.5
 )
 
+
 # ---- UI ----
 ui <- fluidPage(
   titlePanel("Influenza H3N2 model"),
@@ -81,6 +80,10 @@ ui <- fluidPage(
                sidebarPanel(
                  downloadButton("download_plot", "Download Plot (PNG)"),
                  downloadButton("download_table", "Download Table (CSV)"),
+                 hr(),
+                 fileInput("file", 
+                           "Upload custom data, as a csv file - see user guide for format.", 
+                           accept = ".csv"),
                  hr(),
                  h4("Plot settings"),
                  numericInput("y_lim_max", "Maximum y-axis value", value = defaults$y_lim_max, step = 100),
@@ -194,6 +197,14 @@ ui <- fluidPage(
 
 # ---- Server ----
 server <- function(input, output, session) {
+  
+  flu_dat <- reactive({
+    if (is.null(input$file)) {
+      read_csv("data/final/flu_2022_2023.csv")
+    } else {
+      read_csv(input$file$datapath)
+    }
+  })
   
   # helper that builds & runs the model; made reactive so UI changes update automatically
   run_model_raw <- reactive({
@@ -486,7 +497,7 @@ server <- function(input, output, session) {
     date_key <- res$date_key
     
     age_group_key1 <- c("0-4" = "[0,5)", "5-18" = "[5,18)", "19-64" = "[18,65)", "65+" = "65+")
-    flu_dat1 <- flu_dat %>% filter(date >= res$meta$start_date, date <= res$meta$end_date)
+    flu_dat1 <- flu_dat() %>% filter(date >= res$meta$start_date, date <= res$meta$end_date)
     flu_dat1$age_group <- age_group_key1[flu_dat1$age_group]
     flu_dat1$age_group <- factor(flu_dat1$age_group, levels = age_group_key1)
     
@@ -643,7 +654,8 @@ server <- function(input, output, session) {
       inc$age_group <- age_group_key[inc$age_group]; inc$age_group <- factor(inc$age_group, levels = age_group_key)
       date_key <- res$date_key
       age_group_key1 <- c("0-4"="[0,5)","5-18"="[5,18)","19-64"="[18,65)","65+"="65+")
-      flu_dat1 <- flu_dat %>% filter(date >= res$meta$start_date, date <= res$meta$end_date)
+      
+      flu_dat1 <- flu_dat() %>% filter(date >= res$meta$start_date, date <= res$meta$end_date)
       flu_dat1$age_group <- age_group_key1[flu_dat1$age_group]; flu_dat1$age_group <- factor(flu_dat1$age_group, levels = age_group_key1)
       
       rects <- data.frame(
