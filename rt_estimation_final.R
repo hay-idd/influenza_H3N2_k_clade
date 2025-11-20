@@ -23,28 +23,28 @@ df<-data.frame("date"=flu_net_data$date, "cases"=flu_net_data$flu_pos_sum)
 ####function to generate daily incidence from weekly incidence data 
 #enter the dataframe with date and cases as columns:
 scale_daily_to_weekly <- function(weekly_data_frame,roll_d) {
-#assign the average form the weekly case data to each day, and take the rolling mean 
+  #assign the average form the weekly case data to each day, and take the rolling mean 
   
-daily_df <- weekly_data_frame %>%
-  rowwise() %>%
-  mutate(
-    daily_dates = list(seq(date, by = "day", length.out = 7)),
-    daily_cases = list(rep(cases/7, 7))
-  ) %>%
-  unnest(cols = c(daily_dates, daily_cases)) %>%
-  select(daily_dates, daily_cases) %>%  # Keep only daily columns
-  rename(date = daily_dates, cases = daily_cases)
-
-
-# Compute 7-day rolling mean of cases
-daily_df$rolling_mean <- rollmean(daily_df$cases, k = roll_d, fill = NA, align = "right")
-
-# Compute growth rate: ratio of current rolling mean to previous rolling mean
-daily_df$growth_rate <- daily_df$rolling_mean / lag(daily_df$rolling_mean)
-
-#Remove NA rows 
-daily_df <- na.omit(daily_df)
-
+  daily_df <- weekly_data_frame %>%
+    rowwise() %>%
+    mutate(
+      daily_dates = list(seq(date, by = "day", length.out = 7)),
+      daily_cases = list(rep(cases/7, 7))
+    ) %>%
+    unnest(cols = c(daily_dates, daily_cases)) %>%
+    select(daily_dates, daily_cases) %>%  # Keep only daily columns
+    rename(date = daily_dates, cases = daily_cases)
+  
+  
+  # Compute 7-day rolling mean of cases
+  daily_df$rolling_mean <- rollmean(daily_df$cases, k = roll_d, fill = NA, align = "right")
+  
+  # Compute growth rate: ratio of current rolling mean to previous rolling mean
+  daily_df$growth_rate <- daily_df$rolling_mean / lag(daily_df$rolling_mean)
+  
+  #Remove NA rows 
+  daily_df <- na.omit(daily_df)
+  
   return(daily_df)
 }
 
@@ -54,8 +54,8 @@ daily_data<-scale_daily_to_weekly(df,14)
 
 #to compare the daily cases vs. weekly cases: 
 #ggplot(data=daily_data,aes(x=date,y = rolling_mean))+
- # geom_line()+
- # geom_line(data=df,aes(x=date,y=cases), color="red")
+# geom_line()+
+# geom_line(data=df,aes(x=date,y=cases), color="red")
 
 
 #####estimate the Rt:
@@ -118,10 +118,10 @@ Rt_df <- data.frame(
 
 Rt_df <- Rt_df %>%
   mutate(
-   season_year = if_else(month(date) >= 9, year(date), year(date) - 1),
-   season_label = paste0(season_year, "-", season_year + 1),
+    season_year = if_else(month(date) >= 9, year(date), year(date) - 1),
+    season_label = paste0(season_year, "-", season_year + 1),
     day_in_season = as.numeric(date - as.Date(paste0(season_year, "-09-01"))) # day 0 = September 1
- )
+  )
 
 # 2. Plot Rt by season using facet_wrap
 p_Rt <- ggplot(Rt_df, aes(x = day_in_season, y = Rt_mean)) +
@@ -146,23 +146,21 @@ for (i in 1:length(xx)) {
     xlab("Date")+
     # labs(title = "Daily Interpolated Cases", x = "Date", y = "Cases") +
     theme_minimal()
-
+  
   
   p_Rt <- ggplot(subset(Rt_df,Rt_df$season_label==xx[i]), aes(x = day_in_season, y = Rt_mean)) +
     geom_line(color = "darkred", size = 1) +
     geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper), alpha = 0.2, fill = "red") +
     facet_wrap(~ season_label, scales = "free") +
-    geom_hline(yintercept = 1, linetype = "dashed", color = "black") +  # <-- horizontal line
-    # labs(title = "Estimated Reproduction Number (Rt) by Influenza Season",
-    #    x = "Date", y = "Rt") +
+    geom_hline(yintercept = 1, linetype = "dashed", color = "black") + 
     ylab("Estimated Rt")+
     xlab("Date")+
     theme_minimal()
   
   
- pl<- p_incidence/p_Rt
- name<-paste0("rt_estimates_plots/plot_",xx[i],".png") 
- 
+  pl<- p_incidence/p_Rt
+  name<-paste0("rt_estimates_plots/plot_",xx[i],".png") 
+  
   ggsave(name,pl,height =6 ,width = 4)
 }
 
@@ -217,7 +215,7 @@ case_pl_1<-ggplot(daily_case_data, aes(x = day_in_season, y = rolling_mean, colo
   #coord_cartesian(ylim=c(0,1500))+
   theme_bw()+
   facet_wrap(~season_label, ncol = 3,scales="free_y") +  # vertical alignment
-scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
+  scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   #scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   labs(title = "Daily incidence (interpolated) by influenza season",
        x = "Day in season (season starts September 1)", y = "Daily incidence") +
@@ -236,10 +234,6 @@ p_Rt_1 <- ggplot(Rt_df, aes(x = day_in_season, y = Rt_mean, color = pandemic_pha
   facet_wrap(~season_label, ncol = 3) +
   theme_bw()+
   geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
- # annotate("text", x = max(Rt_df$day_in_season) - 10, y = 1.2, 
-          # label = "1.2", color = "darkred", hjust = 1, vjust = -0.5, size = 3) +
-#  annotate("text", x = max(Rt_df$day_in_season) - 10,
-         #  y = 1.4, label = "1.4", color = "darkred", hjust = 1, vjust = -0.5, size = 3) +
   scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   labs(title = "Estimated effective reproduction number (Rt) by influenza season",
@@ -248,75 +242,22 @@ p_Rt_1 <- ggplot(Rt_df, aes(x = day_in_season, y = Rt_mean, color = pandemic_pha
         legend.position = "bottom")
 
 p_Rt_1
- 
+
 pl<-case_pl_1/p_Rt_1
 pl
 
 ggsave("rt_estimates_plots/rt_estimates_by_pandemic_phase_and_season.png",pl,height =12 ,width = 10)
 
 
-case_pl_2<- ggplot(daily_case_data, aes(x = day_in_season, y = rolling_mean, color = season_label)) +
-  geom_line(size = 1) +
-  facet_wrap(~ season_label, ncol = 3) +  # vertical alignment
-  geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
-  # scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
-  # scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
-  labs(title = "Daily incidence by influenza season",
-       x = "Day in season (season starts September 1)", y = "Daily incidence") +
-  theme_minimal()+
-  theme(legend.title = element_blank())+
-  theme(legend.position = "none")
-
-case_pl_2
-
-p_Rt_2 <- ggplot(Rt_df, aes(x = day_in_season, y = Rt_mean, color = season_label)) +
-  geom_line(size = 1) +
-  geom_hline(yintercept = 1.2, linetype = "dotted", color = "darkred", size = .5) +
-  geom_hline(yintercept = 1.4, linetype = "dotted", color = "darkred", size = .5) +
-  geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper, fill = season_label), alpha = 0.4, color = NA) +
-  facet_wrap(~ season_label, ncol = 3) +  # vertical alignment
-  coord_cartesian(ylim=c(0,2))+
-  geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
- # scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
- # scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
-  labs(title = "Estimated reproduction number (Rt) by influenza season",
-       x = "Day in season (season starts September 1)", y = expression("Estimated " * R[t])) +
-  theme_minimal()+
-  theme(legend.title = element_blank())+
-  theme(legend.position = "none")
-
-p_Rt_2
-
-pl2<-case_pl_2/p_Rt_2
-pl2
-
-ggsave("rt_estimates_plots/rt_estimates_by_season.png",pl2,height =12 ,width = 10)
 
 
 # Find peak Rt date for each season (pre-Christmas)
-peak_dates <- Rt_df %>%
-  filter(month(date) < 12) %>%  # restrict to pre-Christmas
-  group_by(season_label) %>%
-  slice_max(order_by = Rt_mean, n = 1) %>%
-  select(season_label, peak_date = date)
-
-
-
-#peak_dates <- Rt_df %>%
- # filter(month(date) < 12 | (month(date) == 12 & day(date) < 24)) %>%  # pre-Christmas (before Dec 24)
- # group_by(season_label) %>%
-  #slice_max(order_by = Rt_mean, n = 1) %>%
-  #select(season_label, peak_date = date)
-
 peak_dates <- Rt_df %>%
   group_by(season_label) %>%
   filter(month(date) > 6  & (month(date) < 12 | day(date)<25 )) %>%  
   slice_max(order_by = Rt_mean, n = 1) %>%
   select(season_label, peak_date = date, peak_Rt = Rt_mean, Rt_lower=Rt_lower,   Rt_upper= Rt_upper)
 
-#Rt_df_shifted <- Rt_df %>%
-#  left_join(peak_dates, by = "season_label") %>%
-  #mutate(days_since_peak = as.numeric(date - peak_date))  # x-axis variable
 
 Rt_df_shifted <- Rt_df %>%
   left_join(peak_dates, by = "season_label", suffix = c("", "_peak")) %>%
@@ -325,8 +266,8 @@ Rt_df_shifted <- Rt_df %>%
 p_Rt_shifted_1 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean, color = pandemic_phase)) +
   geom_line(size = 1) +
   coord_cartesian(ylim=c(0,2.5))+
- xlim(c(-50,50))+
- # xlim(c(-100,100))+
+  xlim(c(-50,50))+
+  # xlim(c(-100,100))+
   theme_bw()+
   geom_vline(xintercept = 0, linetype = "dotted", color = "darkred") +
   # Add text labels for peak Rt  
@@ -341,7 +282,7 @@ p_Rt_shifted_1 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean, co
   scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   labs(title = "Rt estimates aligned to peak pre-Christmas Rt",
        x = "Days since peak Rt", y = expression("Estimated " * R[t])) +
- theme(legend.position = "bottom")+
+  theme(legend.position = "bottom")+
   theme(legend.title = element_blank())
 
 p_Rt_shifted_1
@@ -351,95 +292,7 @@ p_Rt_shifted_1
 ggsave("rt_estimates_plots/pre-Christmas_rt_estimates_by_season_1_before_chrismas_day.png",p_Rt_shifted_1,height =8 ,width = 10)
 
 
-# Define current season
-current_season <- "2025-2026"
-
-Rt_df_shifted <- Rt_df_shifted %>%
-  mutate(highlight = if_else(season_label == current_season, "Current", "Other"))
-
-p_Rt_shifted_2 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean,
-                                          color = highlight, fill = highlight)) +
-  geom_line(size = 1) +
-  coord_cartesian(ylim=c(0,2.5))+
-  xlim(c(-50, 50)) +
-  geom_vline(xintercept = 0, linetype = "dotted", color = "red") +
-  geom_text(data = peak_dates, aes(x = 5, y = 2, label = paste0(round(peak_Rt, 2))), 
-            inherit.aes = FALSE,    color = "red",     vjust = -0.5,   size = 3  ) +
-  # Add text labels for peak Rt  
- # geom_text(data = peak_dates, aes(x = 0, y = 3, label = paste0(round(peak_Rt, 2))), 
-         #   inherit.aes = FALSE,    color = "red",    angle = 90,    vjust = -0.5,   size = 3  ) +
-  geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper), alpha = 0.4, color = NA) +
-  facet_wrap(~ season_label, ncol = 3) +
-  theme_minimal()+
-  geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
-  scale_color_manual(values = c("Current" = "#d95f02", "Other" = "grey40")) +
-  scale_fill_manual(values = c("Current" = "#d95f02", "Other" = "grey70")) +
-  labs(title = "Rt estimates aligned to peak pre-Christmas Rt",
-       x = "Days since peak Rt", y = expression("Estimated " * R[t])) +
-  theme(legend.position = "bottom",
-        legend.title = element_blank())
-
-p_Rt_shifted_2
-
-ggsave("rt_estimates_plots/pre-Christmas_rt_estimates_by_season_2_before_chrismas_day.png",p_Rt_shifted_2,height =8 ,width = 10)
-
-Rt_df_shifted$season_label <- factor(Rt_df_shifted$season_label,
-                                     levels = c(setdiff(unique(Rt_df_shifted$season_label), current_season),
-                                                current_season))
-
-# Reorder factor so current season is plotted last
-Rt_df_shifted$season_label <- factor(Rt_df_shifted$season_label,
-                                     levels = c(setdiff(unique(Rt_df_shifted$season_label), current_season),
-                                                current_season))
-
-p_Rt_shifted_stacked_1 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean,
-                                                    color = season_label, fill = season_label)) +
-  geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper), alpha = 0.3, color = NA) +
-  geom_line(size = 1) +
- coord_cartesian(ylim = c(0, 2.5)) +
-  xlim(c(-50, 50)) +
-  geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
-  labs(title = "Rt estimates aligned to pre-Christmas peak Rt",
-       x = "Days since peak Rt", y = expression(R[t])) +
-  theme_bw()+
-  theme(legend.position = "bottom",
-        legend.title = element_blank()) +
-  scale_color_manual(values = ifelse(levels(Rt_df_shifted$season_label) == current_season,
-                                     "#d95f02", "grey60")) +
-  scale_fill_manual(values = ifelse(levels(Rt_df_shifted$season_label) == current_season,
-                                    "#d95f02", "grey75"))
-
-p_Rt_shifted_stacked_1
-
-
-ggsave("rt_estimates_plots/pre-Christmas_rt_estimates_by_season_staked_1_befire_chrismas_day.png",p_Rt_shifted_stacked_1,height =8 ,width = 8)
-
-
-tableau_colors <- ggthemes::tableau_color_pal("Tableau 10")(length(unique(Rt_df_shifted$season_label)))
-
-# Make current season darker 
-custom_colors <- setNames(tableau_colors, unique(Rt_df_shifted$season_label))
-custom_colors[current_season] <- "black"  # or a darker shade like "#4B0082"
-
-p_Rt_shifted_stacked_2 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean, color = season_label)) +
-  geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper, fill = season_label), alpha = 0.2, color = NA) +
-  geom_line(size = 1) +
- # coord_cartesian(ylim = c(0, 2)) +
-  xlim(c(-50, 50)) +
-  geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
-  scale_color_manual(values = custom_colors) +
-  scale_fill_manual(values = custom_colors) +
-  labs(title = "Rt estimates aligned to pre-Christmas peak Rt",
-       x = "Days since peak Rt", y = expression(R[t])) +
-  theme_minimal() +
-  theme(legend.position = "bottom",
-        legend.title = element_blank())
-
-p_Rt_shifted_stacked_2
-
-ggsave("rt_estimates_plots/pre-Christmas_rt_estimates_by_season_staked_2_before_chrismas_day_no_limit_on_axis.png",p_Rt_shifted_stacked_2,height =8 ,width = 8)
-
-# Peak Rt per season
+# Peak Rt per season 
 peak_table <- Rt_df %>%
   group_by(season_label) %>%
   slice_max(order_by = Rt_mean, n = 1) %>%
@@ -448,7 +301,8 @@ peak_table <- Rt_df %>%
 
 #  Peak Rt per season ( pre-Christmas)
 peak_pre_xmas_table <- Rt_df %>%
-  filter(month(date) < 12 | (month(date) == 12 & day(date) < 24)) %>%  # pre-Christmas (before Dec 24)
+  filter(month(date) > 6  & (month(date) < 12 | day(date)<25 )) %>%  
+  #filter(month(date) < 12 | (month(date) == 12 & day(date) < 24)) %>%  # pre-Christmas (before Dec 24)
   group_by(season_label) %>%
   slice_max(order_by = Rt_mean, n = 1) %>%
   ungroup() %>%
