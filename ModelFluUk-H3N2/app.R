@@ -104,17 +104,17 @@ ui <- fluidPage(
                              min = as.Date("2022-07-01"),
                              max = as.Date("2022-12-31"),
                              value = defaults$sim_start_date,
-                             timeFormat = "%Y-%m-%d"),
+                             timeFormat = "%Y-%m"),
                  sliderInput("plot_start_date", "Plot start date",
                              min = as.Date("2022-07-01"),
                              max = as.Date("2022-12-31"),
                              value = defaults$plot_start_date,
-                             timeFormat = "%Y-%m-%d"),
+                             timeFormat = "%Y-%m"),
                  sliderInput("sim_end_date", "Simulation end date",
                              min = as.Date("2023-01-01"),
                              max = as.Date("2023-07-01"),
                              value = defaults$sim_end_date,
-                             timeFormat = "%Y-%m-%d"),
+                             timeFormat = "%Y-%m"),
                  hr(),
                  sliderInput("reporting_rate", "Reporting rate (fraction of symptomatic reported)",
                              min = 0, max = 0.01, value = defaults$reporting_rate, step = 0.0001),
@@ -531,17 +531,21 @@ server <- function(input, output, session) {
     y_pos <- res$meta$y_lim_max * 0.95
     rects$y <- y_pos
     
+    print(inc %>% left_join(date_key))
+    
     p <- ggplot(inc %>% left_join(date_key)) +
       geom_rect(data = rects, aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = fill),
                 inherit.aes = FALSE, alpha = 0.25, show.legend = TRUE) +
       geom_text(data = rects, aes(x = mid, y = y, label = label), inherit.aes = FALSE,
                 size = 3, fontface = "bold", vjust = 1) +
-      geom_line(data = flu_dat1, aes(x = date, y = ILI_flu, col = age_group, linetype = "2023/23 season data"),
+      geom_line(data = flu_dat1, aes(x = date, y = ILI_flu, col = age_group, linetype = "2022/23 season data"),
                 alpha = 0.5, linewidth = 1) +
       geom_line(aes(x = date, y = incidence, col = age_group, linetype = "Model"), linewidth = 1) +
       scale_color_brewer("Age group", palette = "Set1") +
       scale_fill_brewer("Holiday period", palette = "Set2") +
-      scale_linetype_manual("Data source", values = c("2023/23 season data" = "dashed", "Model" = "solid")) +
+      scale_linetype_manual("Data source", 
+                            values = c("2022/23 season data" = "dashed", 
+                                       "Model" = "solid")) +
       scale_x_date(breaks = "1 month", expand = c(0, 0)) +
       scale_y_continuous(expand = c(0, 0)) +
       coord_cartesian(ylim = c(0, res$meta$y_lim_max), xlim = c(res$meta$plot_start_date, res$meta$end_date)) +
@@ -579,7 +583,7 @@ server <- function(input, output, session) {
     label_text <- paste0(
       "Peak (weekly symptomatic): ", fmt_num(peak_symptomatic), "\n",
       "Peak (weekly reported): ", fmt_num(peak_val), "\n",
-      "Date of peak: ", if (is.na(peak_date)) "n/a" else format(peak_date, "%Y-%m-%d"), "\n",
+      "Date of peak: ", if (is.na(peak_date)) "n/a" else format(peak_date, "%Y-%m"), "\n",
       "Cumulative symptomatic: ", fmt_num(cum_symp_total)
     )
     
@@ -674,7 +678,10 @@ server <- function(input, output, session) {
       date_key <- res$date_key
       age_group_key1 <- c("0-4"="[0,5)","5-18"="[5,18)","19-64"="[18,65)","65+"="65+")
       
-      flu_dat1 <- flu_dat() %>% filter(date >= res$meta$start_date, date <= res$meta$end_date)
+      flu_dat1 <- flu_dat() %>% filter(date >= res$meta$start_date, date <= res$meta$end_date) %>%
+        mutate(`Data source` = case_when(`Data source` == "2023/23 season data" ~ "2022/23 season data" ,
+                                         T ~ `Data source`))
+      
       flu_dat1$age_group <- age_group_key1[flu_dat1$age_group]; flu_dat1$age_group <- factor(flu_dat1$age_group, levels = age_group_key1)
       
       rects <- data.frame(
@@ -692,12 +699,12 @@ server <- function(input, output, session) {
                   inherit.aes = FALSE, alpha = 0.25, show.legend = TRUE) +
         geom_text(data = rects, aes(x = mid, y = y, label = label), inherit.aes = FALSE,
                   size = 3, fontface = "bold", vjust = 1) +
-        geom_line(data = flu_dat1, aes(x = date, y = ILI_flu, col = age_group, linetype = "2023/23 season data"),
+        geom_line(data = flu_dat1, aes(x = date, y = ILI_flu, col = age_group, linetype = "2022/23 season data"),
                   alpha = 0.5, linewidth = 1) +
         geom_line(aes(x = date, y = incidence, col = age_group, linetype = "Model"), linewidth = 1) +
         scale_color_brewer("Age group", palette = "Set1") +
         scale_fill_brewer("Holiday period", palette = "Set2") +
-        scale_linetype_manual("Data source", values = c("2023/23 season data" = "dashed", "Model" = "solid")) +
+        scale_linetype_manual("Data source", values = c("2022/23 season data" = "dashed", "Model" = "solid")) +
         scale_x_date(breaks = "1 month", expand = c(0, 0)) +
         scale_y_continuous(expand = c(0, 0)) +
         coord_cartesian(ylim = c(0, res$meta$y_lim_max), xlim = c(res$meta$plot_start_date, res$meta$end_date)) +
@@ -726,7 +733,7 @@ server <- function(input, output, session) {
       label_text <- paste0(
         "Peak (weekly symptomatic): ", fmt_num(peak_symptomatic), "\n",
         "Peak (weekly reported): ", fmt_num(peak_val), "\n",
-        "Date of peak: ", if (is.na(peak_date)) "n/a" else format(peak_date, "%Y-%m-%d"), "\n",
+        "Date of peak: ", if (is.na(peak_date)) "n/a" else format(peak_date, "%Y-%m"), "\n",
         "Cumulative symptomatic: ", fmt_num(cum_symp_total)
       )
       x_pos <- as.Date(res$meta$end_date) - 3
