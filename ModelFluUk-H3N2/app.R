@@ -29,7 +29,6 @@ shopping_period_start <- as.Date("2022-12-01")
 shopping_period_end   <- as.Date("2022-12-15")
 winter_holiday_start  <- as.Date("2022-12-21")
 winter_holiday_end    <- as.Date("2023-01-04")
-N_tot <- 60000000
 age_breaks <- c(0,5,18,65)
 
 data("polymod")
@@ -49,6 +48,7 @@ defaults <- list(
   plot_start_date = as.Date("2022-10-01"),
   sim_end_date = as.Date("2023-03-01"),
   reporting_rate = 0.0012,
+  N_tot = 60e6,
   prop_home_contacts_in_hols = 1,
   prop_work_contacts_in_hols = 0.75,
   prop_rest_contacts_in_hols = 1.1,
@@ -90,6 +90,15 @@ ui <- fluidPage(
                  numericInput("R0", "Basic reproductive number R0", value = defaults$R0, step = 0.01),
                  numericInput("gamma", "Infectious period (days) gamma", value = defaults$gamma, step = 0.1),
                  numericInput("seed_size", "Seed size (number of initial infections)", value = defaults$seed_size, step = 10),
+                 sliderInput("N_tot", "Population Size",
+                             min = 10e6,
+                             max = 150e6,
+                             value = defaults$N_tot),
+                 sliderInput("sim_start_date", "Seed date",
+                             min = as.Date("2022-07-01"),
+                             max = as.Date("2022-12-31"),
+                             value = defaults$sim_start_date,
+                             timeFormat = "%Y-%m-%d"),
                  sliderInput("sim_start_date", "Seed date",
                              min = as.Date("2022-07-01"),
                              max = as.Date("2022-12-31"),
@@ -328,7 +337,7 @@ server <- function(input, output, session) {
     N_age_classes <- length(N_props)
     
     N_props_long <- c(N_props * (1 - prop_immune), N_props * (prop_immune))
-    N <- matrix(N_props_long * N_tot, ncol = length(alphas), nrow = N_age_classes)
+    N <- matrix(N_props_long * input$N_tot, ncol = length(alphas), nrow = N_age_classes)
     beta_par <- get_beta(C_term, polymod_c_term$participants$proportion, gamma, R0)
     
     beta_scales <- rep(1, N_age_classes)
