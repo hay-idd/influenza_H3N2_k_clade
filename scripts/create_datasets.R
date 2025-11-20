@@ -177,7 +177,7 @@ influenza_cases_eng <- influenza_cases_eng %>% rename(date=Date,Week=`Week numbe
 write_csv(influenza_cases_eng,"data/final/england_h3_cases_historic.csv")
 
 ## Compare to WHO FluNet data
-flunet_data <- read_csv("data/WHO FluNet/FlunetData_United Kingdom, England_All Sites_for_02 January 2012 to 27 October 2025.csv") %>% select(-1)
+flunet_data <- read_csv("data/WHO_FluNet/England_All Sites_02Jan2012_27Oct2025.csv") %>% select(-1)
 colnames(flunet_data) <- c("country","surv_type","year_week","week_start","N","flu_pos","flu_neg","H1N1pdm","H3","not_subtyped")
 ## Create integer time index from the weeks
 t_start <- flunet_data$week_start[1]
