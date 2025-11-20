@@ -19,6 +19,7 @@ library(ggpubr)
 library(data.table)
 library(tidyr)
 library(DT)
+library(shinycssloaders)
 
 # setwd("~/influenza_H3N2_k_clade/shiny_app/")
 
@@ -78,6 +79,8 @@ ui <- fluidPage(
     tabPanel("Model",
              sidebarLayout(
                sidebarPanel(
+                 actionButton("run_model", "Run Model"),
+                 hr(),
                  downloadButton("download_plot", "Download Plot (PNG)"),
                  downloadButton("download_table", "Download Table (CSV)"),
                  hr(),
@@ -97,11 +100,6 @@ ui <- fluidPage(
                              min = 10e6,
                              max = 150e6,
                              value = defaults$N_tot),
-                 sliderInput("sim_start_date", "Seed date",
-                             min = as.Date("2022-07-01"),
-                             max = as.Date("2022-12-31"),
-                             value = defaults$sim_start_date,
-                             timeFormat = "%Y-%m-%d"),
                  sliderInput("sim_start_date", "Seed date",
                              min = as.Date("2022-07-01"),
                              max = as.Date("2022-12-31"),
@@ -160,15 +158,19 @@ ui <- fluidPage(
                  fluidRow(
                    column(12,
                           wellPanel(
+                            h4("Status"),
+                            textOutput("status"),
+                            h4(),
                             h4("Reported symptomatic cases (weekly)"),
-                            plotOutput("inc_plot", height = "600px"),
+                            withSpinner(plotOutput("inc_plot", height = "600px")),
                             hr(),
                             h4("Cumulative cases"),
                             div(style = "max-height:300px; overflow-y:auto; overflow-x:auto;",
-                                DT::dataTableOutput("cum_table")
+                                withSpinner(DT::dataTableOutput("cum_table"))
                             ),
+                            hr(),
                             h4("Contact matrices (term / term-break / Christmas period / Christmas break)"),
-                            plotOutput("contact_matrices_plot", height = "900px")
+                            withSpinner(plotOutput("contact_matrices_plot", height = "900px"))
                           ))
                  ),
                  width = 9
@@ -198,6 +200,15 @@ ui <- fluidPage(
 # ---- Server ----
 server <- function(input, output, session) {
   
+  # Flag indicating inputs changed after last run
+  params_changed <- reactiveVal(FALSE)
+  
+  observeEvent({
+    list(input)
+  }, {
+    params_changed(TRUE)
+  }, ignoreInit = TRUE)
+  
   flu_dat <- reactive({
     if (is.null(input$file)) {
       read_csv("data/final/flu_2022_2023.csv")
@@ -206,8 +217,13 @@ server <- function(input, output, session) {
     }
   })
   
+  model_running <- reactiveVal(FALSE)
+  
   # helper that builds & runs the model; made reactive so UI changes update automatically
-  run_model_raw <- reactive({
+  run_model_raw <- eventReactive(input$run_model,{
+    model_running(TRUE)
+    on.exit(model_running(FALSE), add = TRUE)
+    
     # load helpers inside reactive so they are available in deployed app environment
     source("auxiliary_funcs.R")
     source("sir_functions.R")
@@ -443,6 +459,17 @@ server <- function(input, output, session) {
                      y_lim_max = input$y_lim_max))
   }) # end reactive
   
+  
+  output$status <- renderText({
+    if (input$run_model == 0) {
+      "Click 'Run Model' to begin."
+    } else if (model_running()) {
+      "Model is running..."
+    } else {
+      "Model finished."
+    }
+  })
+  
   # Debounce to avoid running model on every tiny slider movement
   run_model <- shiny::debounce(run_model_raw, millis = 700)
   
@@ -478,6 +505,7 @@ server <- function(input, output, session) {
     updateSliderInput(session, "symp_2", value = defaults$symp_2)
     updateSliderInput(session, "symp_3", value = defaults$symp_3)
     updateSliderInput(session, "symp_4", value = defaults$symp_4)
+    
   })
   
   # ---- Main incidence plot ----
