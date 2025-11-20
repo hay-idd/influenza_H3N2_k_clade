@@ -85,7 +85,7 @@ ui <- fluidPage(
                  downloadButton("download_table", "Download Table (CSV)"),
                  hr(),
                  fileInput("file", 
-                           "Upload custom data, as a csv file - see user guide for format.", 
+                           "[Optional] Upload custom data as a csv file. See user guide for format.", 
                            accept = ".csv"),
                  hr(),
                  h4("Plot settings"),
@@ -199,15 +199,6 @@ ui <- fluidPage(
 
 # ---- Server ----
 server <- function(input, output, session) {
-  
-  # Flag indicating inputs changed after last run
-  params_changed <- reactiveVal(FALSE)
-  
-  observeEvent({
-    list(input)
-  }, {
-    params_changed(TRUE)
-  }, ignoreInit = TRUE)
   
   flu_dat <- reactive({
     if (is.null(input$file)) {
