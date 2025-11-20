@@ -531,8 +531,6 @@ server <- function(input, output, session) {
     y_pos <- res$meta$y_lim_max * 0.95
     rects$y <- y_pos
     
-    print(inc %>% left_join(date_key))
-    
     p <- ggplot(inc %>% left_join(date_key)) +
       geom_rect(data = rects, aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = fill),
                 inherit.aes = FALSE, alpha = 0.25, show.legend = TRUE) +
@@ -678,9 +676,7 @@ server <- function(input, output, session) {
       date_key <- res$date_key
       age_group_key1 <- c("0-4"="[0,5)","5-18"="[5,18)","19-64"="[18,65)","65+"="65+")
       
-      flu_dat1 <- flu_dat() %>% filter(date >= res$meta$start_date, date <= res$meta$end_date) %>%
-        mutate(`Data source` = case_when(`Data source` == "2023/23 season data" ~ "2022/23 season data" ,
-                                         T ~ `Data source`))
+      flu_dat1 <- flu_dat() %>% filter(date >= res$meta$start_date, date <= res$meta$end_date)
       
       flu_dat1$age_group <- age_group_key1[flu_dat1$age_group]; flu_dat1$age_group <- factor(flu_dat1$age_group, levels = age_group_key1)
       
