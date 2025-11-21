@@ -196,6 +196,10 @@ ui <- fluidPage(
                  fluidRow(
                    column(12,
                           wellPanel(
+                            h4("Status"),
+                            textOutput("status"),
+                            h4(),
+                            
                             h4("Reported symptomatic cases (weekly)"),
                             plotOutput("combined_plot", height = "760px"), # combined plot includes growth plot
                             hr(),
@@ -237,6 +241,10 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   
+  # ensure helper functions from your files are available
+  source("auxiliary_funcs.R")
+  source("sir_functions.R")
+  
   output$about_csv <- DT::renderDataTable({
     df <- read.csv("data/final/flu_2022_2023.csv", 
                    stringsAsFactors = FALSE) %>%
@@ -260,12 +268,12 @@ server <- function(input, output, session) {
   })
   
   model_running <- reactiveVal(FALSE)
-  
-  
-  run_model_raw <- reactive({
-    # ensure helper functions from your files are available
-    source("auxiliary_funcs.R")
-    source("sir_functions.R")
+
+  # helper that builds & runs the model; made reactive so UI changes update automatically
+  run_model <- eventReactive(input$run_model,{
+    model_running(TRUE)
+    on.exit(model_running(FALSE), add = TRUE)
+
     
     # local inputs
     start_date <- input$sim_start_date
@@ -398,10 +406,17 @@ server <- function(input, output, session) {
          cumulative_incidence = cumulative_incidence,
          contact_matrices = contact_matrices,
          meta = meta)
-  }) # end run_model_raw
+  }) # end run_model
   
-  # Debounced reactive
-  run_model <- shiny::debounce(run_model_raw, millis = 700)
+  output$status <- renderText({
+    if (input$run_model == 0) {
+      "Click 'Run Model' to begin."
+    } else if (model_running()) {
+      "Model is running..."
+    } else {
+      "Model finished."
+    }
+  })
   
   # Reset defaults
   observeEvent(input$reset_defaults, {
