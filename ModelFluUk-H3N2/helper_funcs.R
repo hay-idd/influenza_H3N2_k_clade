@@ -2,6 +2,9 @@
 # Helper functions
 # --------------------------
 
+contacts_all <- polymod$contacts
+polymod_base <- polymod
+
 build_contact_matrices <- function(input) {
   polymod_c_term <- contact_matrix(polymod_base,
                                    countries = "United Kingdom",
@@ -116,9 +119,9 @@ build_incidence_plot <- function(res, input, flu_dat) {
   date_key <- res$date_key
   
   age_group_key1 <- c("0-4"="[0,5)","5-18"="[5,18)","19-64"="[18,65)","65+"="65+")
-  flu_dat1 <- flu_dat %>% filter(date >= res$meta$start_date, date <= res$meta$end_date)
-  flu_dat1$age_group <- age_group_key1[flu_dat1$age_group]
-  flu_dat1$age_group <- factor(flu_dat1$age_group, levels = age_group_key1)
+  flu_subset_dat <- flu_dat %>% filter(date >= res$meta$start_date, date <= res$meta$end_date)
+  flu_subset_dat$age_group <- age_group_key1[flu_subset_dat$age_group]
+  flu_subset_dat$age_group <- factor(flu_subset_dat$age_group, levels = age_group_key1)
   
   rects <- data.frame(
     xmin = as.Date(c(half_term_start, shopping_period_start, winter_holiday_start)),
@@ -136,7 +139,7 @@ build_incidence_plot <- function(res, input, flu_dat) {
               inherit.aes = FALSE, alpha = 0.25, show.legend = TRUE) +
     geom_text(data = rects, aes(x = mid, y = y, label = label), inherit.aes = FALSE,
               size = 3, fontface = "bold", vjust = 1) +
-    geom_line(data = flu_dat1, aes(x = date, y = ILI_flu, col = age_group, linetype = "2023/23 season data"),
+    geom_line(data = flu_subset_dat, aes(x = date, y = ILI_flu, col = age_group, linetype = "2023/23 season data"),
               alpha = 0.5, linewidth = 1) +
     geom_line(aes(x = date, y = incidence, col = age_group, linetype = "Model"), linewidth = 1) +
     scale_color_brewer("Age group", palette = "Set1") +
@@ -338,7 +341,7 @@ build_combined_plot <- function(res, input, flu_dat) {
   combined
 }
 
-save_plot_and_data_zip <- function(plot_obj, plot_data, growth_data, flu_dat1, res, zip_path) {
+save_plot_and_data_zip <- function(plot_obj, plot_data, growth_data, flu_subset_dat, res, zip_path) {
   tmpdir <- tempfile("model_plot_zip")
   dir.create(tmpdir)
   oldwd <- setwd(tmpdir)
@@ -353,8 +356,8 @@ save_plot_and_data_zip <- function(plot_obj, plot_data, growth_data, flu_dat1, r
   # Save higher-resolution PNG to accommodate combined plot
   ggsave(filename = png_name, plot = plot_obj, width = 14, height = 9, dpi = 300)
   
-  # Save R objects: include combined plot object, plot_data (incidence), growth_data, flu_dat1 and res
-  save(plot = plot_obj, plot_data, growth_data, flu_dat1, res, file = rdata_name)
+  # Save R objects: include combined plot object, plot_data (incidence), growth_data, flu_subset_dat and res
+  save(plot = plot_obj, plot_data, growth_data, flu_subset_dat, res, file = rdata_name)
   
   utils::zip(zipfile = zip_path, files = c(png_name, rdata_name))
 }
