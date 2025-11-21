@@ -72,6 +72,10 @@ ui <- fluidPage(
                      actionButton("run_model", "Run Model"),
                      hr(),
                      
+                     actionButton("set_as_reference", 
+                                  "Set current scenario as new reference"),
+                     hr(),
+                     
                      fileInput("file", 
                                "[Optional] Upload custom data as a csv file. See About tab for format.", 
                                accept = ".csv"),
@@ -114,10 +118,14 @@ ui <- fluidPage(
                          br(),
                          
                          sliderInput("reporting_rate", "Reporting rate (fraction of symptomatic reported)",
-                                     min = 0, max = 0.01, value = defaults$reporting_rate, step = 0.0001),
-                         br(),
-                         numericInput("initial_immune_frac", "Initial proportion of the population fully immune", value = defaults$initial_immune_frac, step = 0.01),
-                         numericInput("alpha2", "Relative susceptibility of immune class", value = defaults$alpha2, step = 0.05)
+                                     min = 0, max = 0.01, value = defaults$reporting_rate, step = 0.0001)
+                         
+                         # numericInput("initial_immune_frac", 
+                         #              "Initial proportion of the population fully immune", 
+                         #              value = defaults$initial_immune_frac, step = 0.01),
+                         # numericInput("alpha2", 
+                         #              "Relative susceptibility of immune class", 
+                         #              value = defaults$alpha2, step = 0.05)
                        ),
                        
                        hr(),
@@ -285,7 +293,7 @@ server <- function(input, output, session) {
     prop_immune_older <- input$prop_immune_older
     prop_immune_oldest <- input$prop_immune_oldest
     
-    alphas <- c(1, input$alpha2)
+    alphas <- c(1, defaults$alpha2)
     alphas <- alphas/mean(alphas)
     R0 <- input$R0
     gamma <- input$gamma
@@ -343,7 +351,7 @@ server <- function(input, output, session) {
     # run model
     y_base <- epi_ode_size(C_list, beta_par, gamma, N, ts = ts,
                            alphas = alphas,
-                           initial_immune_frac = input$initial_immune_frac,
+                           initial_immune_frac = defaults$initial_immune_frac,
                            age_seed = 3, immunity_seed = 1,
                            seed_size = seed_size, return_compartments = TRUE)
     
