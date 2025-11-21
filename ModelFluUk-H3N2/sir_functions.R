@@ -94,7 +94,7 @@ general_sir_explicit <- function(t,y, pars, C, Nage,Nimmunity){
 #' @return an NxM matrix of attack rates (ie. proportion of susceptibles becoming infected)
 #' @seealso \code{\link{epi_final_size}}
 #' @export
-epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,
+epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,initial_immune_frac=0,
                                 ts=seq(1,365,by=1),
                                 age_seeds=c(1),immunity_seed=1,seed_size=1,
                                 ver="fast",return_peak=FALSE,return_compartments=FALSE){
@@ -115,16 +115,17 @@ epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,
     start[4] <- 0
     index <- 5
     for(i in 2:length(long_Ns)){
-      start[index] <- long_Ns[i]
+      start[index] <- (1-initial_immune_frac)*long_Ns[i] ## Susceptible
       index <- index + 1
-      start[index] <- 0
+      start[index] <- 0 ## Infected
       index <- index + 1
-      start[index] <- 0
+      start[index] <- initial_immune_frac*long_Ns[i] ## Recovered
       index <- index + 1
       start[index] <- 0
       index <- index + 1
     }
     start[start < 0] <- 0
+    
     
     ## Move one susceptible to the infected classes for the seed population
     for(age_seed in age_seeds){
