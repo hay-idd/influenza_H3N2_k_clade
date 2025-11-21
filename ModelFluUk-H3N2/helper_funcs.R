@@ -139,13 +139,13 @@ build_incidence_plot <- function(res, input, flu_dat) {
               inherit.aes = FALSE, alpha = 0.25, show.legend = TRUE) +
     geom_text(data = rects, aes(x = mid, y = y, label = label), inherit.aes = FALSE,
               size = 3, fontface = "bold", vjust = 1) +
-    geom_line(data = flu_subset_dat, aes(x = date, y = ILI_flu, col = age_group, linetype = "2023/23 season data"),
+    geom_line(data = flu_subset_dat, aes(x = date, y = ILI_flu, col = age_group, linetype = "2022/23 season data"),
               alpha = 0.5, linewidth = 1) +
     geom_line(aes(x = date, y = incidence, col = age_group, linetype = "Model"), linewidth = 1) +
     scale_color_brewer("Age group", palette = "Set1") +
     scale_fill_brewer("Holiday period", palette = "Set2") +
-    scale_linetype_manual("Data source", values = c("2023/23 season data" = "dashed", "Model" = "solid")) +
-    scale_x_date(breaks = "1 month", expand = c(0, 0)) +
+    scale_linetype_manual("Data source", values = c("2022/23 season data" = "dashed", "Model" = "solid")) +
+    scale_x_date(breaks = "1 month", date_labels = "%b-%d", expand = c(0, 0)) +
     scale_y_continuous(expand = c(0, 0)) +
     coord_cartesian(ylim = c(0, res$meta$y_lim_max), xlim = c(res$meta$plot_start_date, res$meta$end_date)) +
     theme_bw() +
@@ -180,7 +180,7 @@ build_incidence_plot <- function(res, input, flu_dat) {
   label_text <- paste0(
     "Peak (weekly symptomatic): ", fmt_num(peak_symptomatic), "\n",
     "Peak (weekly reported): ", fmt_num(peak_val), "\n",
-    "Date of peak: ", if (is.na(peak_date)) "n/a" else format(peak_date, "%Y-%m-%d"), "\n",
+    "Date of peak: ", if (is.na(peak_date)) "n/a" else format(peak_date, "%b-%d"), "\n",
     "Cumulative symptomatic: ", fmt_num(cum_symp_total)
   )
   x_pos_peak <- as.Date(res$meta$end_date) - 3
@@ -263,7 +263,7 @@ build_growth_plot <- function(res, input, age_palette = "Set1") {
     geom_line(size = 1) +
     scale_color_brewer("Age group", palette = age_palette) +
     scale_fill_brewer("Holiday period", palette = "Set2") +
-    scale_x_date(breaks = "1 month", expand = c(0, 0)) +
+    scale_x_date(breaks = "1 month", date_labels = "%b-%d", expand = c(0, 0)) +
     coord_cartesian(ylim = c(-ylim_val, ylim_val), xlim = c(res$meta$plot_start_date, res$meta$end_date)) +
     theme_bw() +
     theme(axis.text = element_text(size = 14),          # match incidence text sizes
@@ -361,3 +361,4 @@ save_plot_and_data_zip <- function(plot_obj, plot_data, growth_data, flu_subset_
   
   utils::zip(zipfile = zip_path, files = c(png_name, rdata_name))
 }
+

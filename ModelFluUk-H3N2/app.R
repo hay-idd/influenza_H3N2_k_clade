@@ -15,6 +15,7 @@ source("vars.R")
 source("helper_funcs.R")
 
 ui <- fluidPage(
+  # ---- UI ----
   titlePanel("Influenza H3N2 model"),
   fluidRow(
     column(9, tags$div(style = "margin-bottom:10px;")),
@@ -38,7 +39,7 @@ ui <- fluidPage(
                              min = as.Date("2022-07-01"),
                              max = as.Date("2022-12-31"),
                              value = defaults$plot_start_date,
-                             timeFormat = "%Y-%m-%d"),
+                             timeFormat = "%b-%d"),
                  hr(),
                  
                  # ---- Core parameters ----
@@ -56,12 +57,12 @@ ui <- fluidPage(
                              min = as.Date("2022-07-01"),
                              max = as.Date("2022-12-31"),
                              value = defaults$sim_start_date,
-                             timeFormat = "%Y-%m-%d"),
+                             timeFormat = "%b-%d"),
                  sliderInput("sim_end_date", "Simulation end date",
                              min = as.Date("2023-01-01"),
                              max = as.Date("2023-07-01"),
                              value = defaults$sim_end_date,
-                             timeFormat = "%Y-%m-%d"),
+                             timeFormat = "%b-%d"),
                  sliderInput("reporting_rate", "Reporting rate (fraction of symptomatic reported)",
                              min = 0, max = 0.01, value = defaults$reporting_rate, step = 0.0001),
                  numericInput("initial_immune_frac", "Initial proportion of the population fully immune", value = defaults$initial_immune_frac, step = 0.01),
@@ -133,11 +134,15 @@ ui <- fluidPage(
     ),
     tabPanel("About",
              fluidRow(
-               column(8,
+               column(9,
                       h3("About this model"),
-                      p("Placeholder: description of the model and data goes here. (You can edit this later.)")
+                      p("Placeholder: description of the model and data goes here. (You can edit this later.)"),
+                      br(),
+                      h3("Format for custom CSV file."),
+                      p("Please ensure your file conforms to the following format."),
+                      DT::dataTableOutput("about_csv")
                ),
-               column(4,
+               column(3,
                       h4("Contact / Disclaimer"),
                       p(HTML("<strong>Contact:</strong> James Hay &lt;james.hay@ndm.ox.ac.uk&gt;")),
                       p(HTML("<strong>Disclaimer:</strong> This tool is a work in progress. Use results for exploration only; not for operational decision-making.")),
