@@ -72,7 +72,7 @@ ui <- fluidPage(
                      actionButton("run_model", "Run Model"),
                      hr(),
                      
-                     actionButton("set_as_reference", 
+                     actionButton("set_ref", 
                                   "Set current scenario as new reference"),
                      hr(),
                      
@@ -253,6 +253,9 @@ server <- function(input, output, session) {
   source("auxiliary_funcs.R")
   source("sir_functions.R")
   
+  ref_path <- reactiveVal(NULL)
+  
+  
   output$about_csv <- DT::renderDataTable({
     df <- read.csv("data/final/flu_2022_2023.csv", 
                    stringsAsFactors = FALSE) %>%
@@ -416,6 +419,17 @@ server <- function(input, output, session) {
          meta = meta)
   }) # end run_model
   
+  
+  observeEvent(input$set_ref, {
+    res <- run_model()
+    write.csv(res$cumulative_incidence,
+              "cum_incid.csv",
+              row.names = FALSE)
+    write.csv(res$inc,
+              "inc.csv",
+              row.names = FALSE)
+  })
+  
   output$status <- renderText({
     if (input$run_model == 0) {
       "Click 'Run Model' to begin."
@@ -489,6 +503,8 @@ server <- function(input, output, session) {
                   backgroundColor = styleEqual(c("65+", "Total"), c("#ffe0e0", "#e0ffe0")))
     dat
   })
+  
+    
   
   # SERVER: single combined download handler
   output$download_all <- downloadHandler(
