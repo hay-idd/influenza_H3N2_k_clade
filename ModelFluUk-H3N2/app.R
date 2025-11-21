@@ -182,7 +182,10 @@ ui <- fluidPage(
              fluidRow(
                column(8,
                       h3("About this model"),
-                      p("Placeholder: description of the model and data goes here. (You can edit this later.)")
+                      p("Placeholder: description of the model and data goes here. (You can edit this later.)"),
+                      h3("Format for custom CSV file."),
+                      p("Please ensure your file conforms to the following format."),
+                      DT::dataTableOutput("about_csv")
                ),
                column(4,
                       h4("Contact / Disclaimer"),
@@ -199,6 +202,20 @@ ui <- fluidPage(
 
 # ---- Server ----
 server <- function(input, output, session) {
+  
+  output$about_csv <- DT::renderDataTable({
+    df <- read.csv("data/final/flu_2022_2023.csv", 
+                   stringsAsFactors = FALSE) %>%
+      head(10)
+    
+    DT::datatable(df, options = list(scrollX = TRUE)) |>
+      DT::formatRound(
+        columns = 5:12,
+        digits = 2
+      )
+    }, 
+    options = list(pageLength = 10, scrollX = TRUE))
+  
   
   flu_dat <- reactive({
     if (is.null(input$file)) {
