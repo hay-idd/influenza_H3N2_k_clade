@@ -1,6 +1,4 @@
-# --------------------------
 # Helper functions
-# --------------------------
 
 contacts_all <- polymod$contacts
 polymod_base <- polymod
@@ -109,8 +107,9 @@ make_weights_df <- function(start_date, end_date, smooth_time = 7) {
   list(schedule = school_days_weighted, weights = weights_df)
 }
 
-build_incidence_plot <- function(res, input, flu_dat) {
-  inc <- as.data.frame(res$inc); inc$t <- 1:nrow(inc)
+build_incidence_plot <- function(res, input, flu_dat, last_scenario) {
+  inc <- as.data.frame(res$inc)
+  inc$t <- 1:nrow(inc)
   inc <- inc %>% pivot_longer(-t)
   colnames(inc) <- c("t","age_group","incidence")
   age_group_key <- c("inc_1_1"="[0,5)","inc_2_1"="[5,18)","inc_3_1"="[18,65)","inc_4_1"="65+")
@@ -118,10 +117,23 @@ build_incidence_plot <- function(res, input, flu_dat) {
   inc$age_group <- factor(inc$age_group, levels = age_group_key)
   date_key <- res$date_key
   
-  age_group_key1 <- c("0-4"="[0,5)","5-18"="[5,18)","19-64"="[18,65)","65+"="65+")
-  flu_subset_dat <- flu_dat %>% filter(date >= res$meta$start_date, date <= res$meta$end_date)
-  flu_subset_dat$age_group <- age_group_key1[flu_subset_dat$age_group]
-  flu_subset_dat$age_group <- factor(flu_subset_dat$age_group, levels = age_group_key1)
+  if (!is.null(last_scenario)){
+    
+    flu_subset_dat <- as.data.frame(last_scenario$inc)
+    flu_subset_dat$t <- 1:nrow(flu_subset_dat)
+    flu_subset_dat <- flu_subset_dat %>% pivot_longer(-t)
+    colnames(flu_subset_dat) <- c("date","age_group","ILI_flu")
+    flu_subset_dat$age_group <- age_group_key[flu_subset_dat$age_group]
+    flu_subset_dat$age_group <- factor(flu_subset_dat$age_group, levels = age_group_key)
+    
+  } else{
+    
+    age_group_key1 <- c("0-4"="[0,5)","5-18"="[5,18)","19-64"="[18,65)","65+"="65+")
+    flu_subset_dat <- flu_dat %>% filter(date >= res$meta$start_date, date <= res$meta$end_date)
+    flu_subset_dat$age_group <- age_group_key1[flu_subset_dat$age_group]
+    flu_subset_dat$age_group <- factor(flu_subset_dat$age_group, levels = age_group_key1)
+
+  }
   
   rects <- data.frame(
     xmin = as.Date(c(half_term_start, shopping_period_start, winter_holiday_start)),
@@ -139,8 +151,11 @@ build_incidence_plot <- function(res, input, flu_dat) {
               inherit.aes = FALSE, alpha = 0.25, show.legend = TRUE) +
     geom_text(data = rects, aes(x = mid, y = y, label = label), inherit.aes = FALSE,
               size = 3, fontface = "bold", vjust = 1) +
-    geom_line(data = flu_subset_dat, aes(x = date, y = ILI_flu, col = age_group, linetype = "2022/23 season data"),
+    
+    geom_line(data = flu_subset_dat, 
+              aes(x = date, y = ILI_flu, col = age_group, linetype = "2022/23 season data"),
               alpha = 0.5, linewidth = 1) +
+    
     geom_line(aes(x = date, y = incidence, col = age_group, linetype = "Model"), linewidth = 1) +
     scale_color_brewer("Age group", palette = "Set1") +
     scale_fill_brewer("Holiday period", palette = "Set2") +
@@ -308,8 +323,8 @@ build_contact_matrices_plot <- function(contact_matrices) {
 }
 
 # Combined plot builder (returns a single patchwork object)
-build_combined_plot <- function(res, input, flu_dat) {
-  p1 <- build_incidence_plot(res, input, flu_dat)
+build_combined_plot <- function(res, input, flu_dat, last_scenario) {
+  p1 <- build_incidence_plot(res, input, flu_dat, last_scenario)
   p2 <- build_growth_plot(res, input, age_palette = "Set1")
   
   # remove x-axis from top plot and shrink its bottom margin; nudge top margin of bottom plot

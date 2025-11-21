@@ -279,12 +279,12 @@ server <- function(input, output, session) {
   })
   
   model_running <- reactiveVal(FALSE)
-
+  
   # helper that builds & runs the model; made reactive so UI changes update automatically
   run_model <- eventReactive(input$run_model,{
     model_running(TRUE)
     on.exit(model_running(FALSE), add = TRUE)
-
+    
     
     # local inputs
     start_date <- input$sim_start_date
@@ -420,15 +420,13 @@ server <- function(input, output, session) {
   }) # end run_model
   
   
-  observeEvent(input$set_ref, {
-    res <- run_model()
-    write.csv(res$cumulative_incidence,
-              "cum_incid.csv",
-              row.names = FALSE)
-    write.csv(res$inc,
-              "inc.csv",
-              row.names = FALSE)
+  last_scenario <- reactive({
+    if (input$set_ref == 0) {
+      return(NULL)
+    }
+    run_model()
   })
+  
   
   output$status <- renderText({
     if (input$run_model == 0) {
@@ -475,7 +473,10 @@ server <- function(input, output, session) {
     if (isTRUE(res$error)) {
       plot.new(); text(0.5, 0.5, res$message); return()
     }
-    combined <- build_combined_plot(res, input, flu_dat())
+    combined <- build_combined_plot(res, 
+                                    input, 
+                                    flu_dat(),
+                                    last_scenario())
     print(combined)
   })
   
@@ -504,7 +505,7 @@ server <- function(input, output, session) {
     dat
   })
   
-    
+  
   
   # SERVER: single combined download handler
   output$download_all <- downloadHandler(
@@ -566,7 +567,9 @@ server <- function(input, output, session) {
       # save RData with objects useful for later inspection
       # save combined plot, component plots (if available), the model result 'res' and tables
       # if you want p1/p2 separately, rebuild them quickly:
-      p1 <- build_incidence_plot(res, input, flu_dat())
+      p1 <- build_incidence_plot(res, 
+                                 input,
+                                 flu_dat())
       p2 <- build_growth_plot(res, input, age_palette = "Set1")
       save(p_combined, p1, p2, res, cum_df, inc_long, growth_df, file = rdata_name)
       
