@@ -930,7 +930,25 @@ p_gr_cases <- ggplot(data=gr_case_dat %>% filter(!(season %in% c("2020/21","2021
 ggsave("figures/growth_rates/ukhsa_h3_flu_growth_rate.png",p_gr_cases,width=7,height=4)
 write_csv(gr_case_dat,"results/ukhsa_h3_flu_growth_rates.csv")
 
-p_gr_flunet
-p_gr_flunet_all
-p_gr_cases
-p_gr_cases_all
+gr_plot_data_comb <- bind_rows(p_gr_flunet$data %>% mutate(Scenario = "A/H3N2, WHO FluNet"),
+p_gr_flunet_all$data %>% mutate(Scenario = "All influenza, WHO FluNet"),
+p_gr_cases$data %>% mutate(Scenario = "A/H3N2, UKHSA"),
+p_gr_cases_all$data %>% mutate(Scenario = "All influenza, UKHSA"))
+
+p_gr_all_comb <- ggplot(data=gr_plot_data_comb %>% filter(!(season %in% c("2020/21","2021/22")))) + 
+  ## Add rectange over pandemic
+  geom_rect(xmin=as.Date("2020-01-01"),xmax=as.Date("2022-06-01"),ymin=-Inf,ymax=Inf,fill="grey",alpha=0.2) +
+  ## Add label for pandemic
+  geom_text(data=data.frame(x=as.Date("2021-03-01"),y=0.8,label="COVID-19\npandemic"),aes(x=x,y=y,label=label),size=3) +
+  geom_hline(yintercept=0,linetype="dashed") +
+  geom_ribbon(aes(x=date,ymin=lb_50,ymax=ub_50,group=season),alpha=0.25,fill="blue") +
+  geom_ribbon(aes(x=date,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
+  geom_line(aes(x=date,y=y,group=season),col="black") +
+  #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
+  xlab("Date (by week)") + ylab('Growth rate (per week)') +
+  # scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,by=0.2)) +
+  scale_x_date(date_breaks = "5 years")+
+  theme_use + 
+  theme(legend.position="bottom",legend.direction="horizontal") +
+  facet_wrap(~Scenario)
+ggsave("figures/growth_rates/all_growth_rates_combined.png",p_gr_all_comb,width=8,height=6)

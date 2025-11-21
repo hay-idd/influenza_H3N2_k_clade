@@ -159,17 +159,18 @@ p <- ggplot() +
     fill  = guide_legend(order = 2)
   ) +
   theme(
-    strip.text = element_text(size = 11),
+    strip.text = element_text(size = 10),
     axis.text.x = element_text(size=10),
     legend.position = "bottom",
+    plot.margin = margin(20, 20, 20, 20, "pt"),
     legend.box = "vertical",              # <-- stack legends vertically
     legend.spacing.y = unit(4, "pt"),     # <-- spacing between legend boxes
     panel.spacing.x = unit(1, "cm")       # (your earlier spacing adjustment)
   ) +
-  coord_cartesian(ylim=c(0,5000), expand = FALSE,xlim=as.Date(c("2022-09-01","2023-03-01")))
+  coord_cartesian(ylim=c(0,5000), expand = FALSE,xlim=as.Date(c("2022-09-01","2023-02-01")))
 
 # Save
-ggsave(out_png, p, width = 8, height = 10, dpi = 300)
+ggsave(out_png, p, width = 9, height = 11, dpi = 300)
 message("Saved combined plot: ", out_png)
 break
 # --- Clean all quotes from Scenario & label ---

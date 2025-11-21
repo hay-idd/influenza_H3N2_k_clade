@@ -41,6 +41,7 @@ defaults <- list(
   R0 = 2,
   gamma = 4.6,
   seed_size = 150,
+  initial_immune_frac = 0,
   sim_start_date = as.Date("2022-09-01"),
   plot_start_date = as.Date("2022-10-01"),
   sim_end_date = as.Date("2023-03-01"),
@@ -326,21 +327,22 @@ ui <- fluidPage(
                  hr(),
                  h4("Plot settings"),
                  numericInput("y_lim_max", "Maximum y-axis value", value = defaults$y_lim_max, step = 100),
-                 hr(),
-                 h4("Model parameters"),
-                 numericInput("alpha2", "Relative susceptibility susceptible class", value = defaults$alpha2, step = 0.05),
-                 numericInput("R0", "Basic reproductive number R0", value = defaults$R0, step = 0.01),
-                 numericInput("gamma", "Infectious period (days) gamma", value = defaults$gamma, step = 0.1),
-                 numericInput("seed_size", "Seed size (number of initial infections)", value = defaults$seed_size, step = 10),
-                 sliderInput("sim_start_date", "Seed date",
-                             min = as.Date("2022-07-01"),
-                             max = as.Date("2022-12-31"),
-                             value = defaults$sim_start_date,
-                             timeFormat = "%Y-%m-%d"),
                  sliderInput("plot_start_date", "Plot start date",
                              min = as.Date("2022-07-01"),
                              max = as.Date("2022-12-31"),
                              value = defaults$plot_start_date,
+                             timeFormat = "%Y-%m-%d"),
+                 hr(),
+                 h4("Model parameters"),
+                 numericInput("alpha2", "Relative susceptibility of immune class", value = defaults$alpha2, step = 0.05),
+                 numericInput("R0", "Basic reproductive number R0", value = defaults$R0, step = 0.01),
+                 numericInput("gamma", "Infectious period (days) gamma", value = defaults$gamma, step = 0.1),
+                 numericInput("seed_size", "Seed size (number of initial infections)", value = defaults$seed_size, step = 10),
+                 numericInput("initial_immune_frac", "Initial proportion of the population fully immune", value = defaults$initial_immune_frac, step = 0.01),
+                 sliderInput("sim_start_date", "Seed date",
+                             min = as.Date("2022-07-01"),
+                             max = as.Date("2022-12-31"),
+                             value = defaults$sim_start_date,
                              timeFormat = "%Y-%m-%d"),
                  sliderInput("sim_end_date", "Simulation end date",
                              min = as.Date("2023-01-01"),
@@ -444,6 +446,9 @@ server <- function(input, output, session) {
     prop_immune_oldest <- input$prop_immune_oldest
     
     alphas <- c(1, input$alpha2)
+    ## Set alphas to average 1
+    alphas <- alphas/mean(alphas)
+    print(alphas)
     R0 <- input$R0
     gamma <- input$gamma
     seed_size <- input$seed_size
@@ -495,7 +500,9 @@ server <- function(input, output, session) {
     
     # run model
     y_base <- epi_ode_size(C_list, beta_par, gamma, N, ts = ts,
-                           alphas = alphas, age_seed = 3, immunity_seed = 1,
+                           alphas = alphas,
+                           initial_immune_frac = input$initial_immune_frac,
+                           age_seed = 3, immunity_seed = 1,
                            seed_size = seed_size, return_compartments = TRUE)
     
     use_cols <- which(colnames(y_base) %like% "inc")
