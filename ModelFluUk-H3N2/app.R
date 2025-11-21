@@ -10,11 +10,51 @@ library(data.table)
 library(tidyr)
 library(DT)
 library(shinycssloaders)
+library(bslib)
 
 source("vars.R")
 source("helper_funcs.R")
 
 ui <- fluidPage(
+  theme = bs_theme(version = 5,
+                   # bootswatch = "litera"),
+                   # bootswatch = "flatly"),
+                   bootswatch = "cosmo"),
+  
+  # put this near the top of fluidPage
+  tags$style(HTML("
+    /* Accordion titles + bodies */
+    .accordion .accordion-button {
+      font-size: 14px !important;
+      padding: 0.35rem 0.6rem !important;
+    }
+    .accordion .accordion-body {
+      font-size: 12px;
+      padding: 0.4rem 0.6rem !important;
+    }
+
+    /* Make labels + inputs inside the sidebar smaller */
+    .compact-sidebar .form-label,
+    .compact-sidebar .control-label,
+    .compact-sidebar .shiny-input-container {
+      font-size: 12px;
+    }
+
+    .compact-sidebar .form-control,
+    .compact-sidebar .form-select {
+      font-size: 12px;
+      padding: 0.1rem 0.35rem;
+      height: calc(1.4em + 0.4rem + 2px);
+    }
+
+    /* Sliders */
+    .compact-sidebar .form-range {
+      height: 0.25rem;
+    }
+  ")),
+  
+  
+  
   # ---- UI ----
   titlePanel("Influenza H3N2 model"),
   fluidRow(
@@ -27,91 +67,131 @@ ui <- fluidPage(
     tabPanel("Model",
              sidebarLayout(
                sidebarPanel(
-                 # single combined download
-                 downloadButton("download_all", "Download results (zip)"),
-                 hr(),
-                 
-                 # ---- Plot options (matches defaults$Plot options tab) ----
-                 h4("Plot options"),
-                 numericInput("y_lim_max", "Maximum y-axis value", value = defaults$y_lim_max, step = 100),
-                 numericInput("growth_y_scale", "Growth plot y-scale (symmetric)", value = defaults$growth_y_scale, step = 0.1),
-                 sliderInput("plot_start_date", "Plot start date",
-                             min = as.Date("2022-07-01"),
-                             max = as.Date("2022-12-31"),
-                             value = defaults$plot_start_date,
-                             timeFormat = "%b-%d"),
-                 hr(),
-                 
-                 # ---- Core parameters ----
-                 h4("Model parameters (core)"),
-                 numericInput("R0", "Basic reproductive number R0", value = defaults$R0, step = 0.01),
-                 numericInput("gamma", "Infectious period (days) gamma", value = defaults$gamma, step = 0.1),
-                 
-                 
-                 sliderInput("overall_immune_escape", "Overall immune escape (multiplier on immunity - lower value means more antigenic drift )",
-                             min = 0, max = 2, value = defaults$overall_immune_escape, step = 0.01),
-                 
-                 
-                 numericInput("seed_size", "Seed size (number of initial infections)", value = defaults$seed_size, step = 10),
-                 sliderInput("sim_start_date", "Seed date",
-                             min = as.Date("2022-07-01"),
-                             max = as.Date("2022-12-31"),
-                             value = defaults$sim_start_date,
-                             timeFormat = "%b-%d"),
-                 sliderInput("sim_end_date", "Simulation end date",
-                             min = as.Date("2023-01-01"),
-                             max = as.Date("2023-07-01"),
-                             value = defaults$sim_end_date,
-                             timeFormat = "%b-%d"),
-                 sliderInput("reporting_rate", "Reporting rate (fraction of symptomatic reported)",
-                             min = 0, max = 0.01, value = defaults$reporting_rate, step = 0.0001),
-                 numericInput("initial_immune_frac", "Initial proportion of the population fully immune", value = defaults$initial_immune_frac, step = 0.01),
-                 numericInput("alpha2", "Relative susceptibility of immune class", value = defaults$alpha2, step = 0.05),
-                 
-                 hr(),
-                 
-                 # ---- Contact patterns ----
-                 h4("Contact patterns"),
-                 h5("School holiday contacts"),
-                 sliderInput("prop_home_contacts_in_hols", "Multiplier for home contacts in breaks",
-                             min = 0, max = 3, value = defaults$prop_home_contacts_in_hols, step = 0.01),
-                 sliderInput("prop_work_contacts_in_hols", "Proportion of work contacts kept in school holidays",
-                             min = 0, max = 1, value = defaults$prop_work_contacts_in_hols, step = 0.01),
-                 sliderInput("prop_rest_contacts_in_hols", "Multiplier for non-school or work contacts in breaks",
-                             min = 0.5, max = 3, value = defaults$prop_rest_contacts_in_hols, step = 0.01),
-                 hr(),
-                 h5("Christmas period contacts (before school holiday)"),
-                 sliderInput("prop_all_contacts_christmas", "Multiplier for all non-school contacts in Christmas period",
-                             min = 0.5, max = 3, value = defaults$prop_all_contacts_christmas, step = 0.01),
-                 hr(),
-                 h5("Christmas holiday contacts"),
-                 sliderInput("prop_rest_contacts_in_christmas", "Proportion of all contacts kept over Christmas",
-                             min = 0, max = 1, value = defaults$prop_rest_contacts_in_christmas, step = 0.01),
-                 sliderInput("prop_home_contacts_in_christmas", "Multiplier for home contacts over Christmas holiday",
-                             min = 1, max = 5, value = defaults$prop_home_contacts_in_christmas, step = 0.01),
-                 
-                 hr(),
-                 
-                 # ---- Immunity and disease ----
-                 h4("Immunity and disease"),
-                 sliderInput("prop_immune_younger", "Proportion immune (0-4 yrs)",
-                             min = 0, max = 1, value = defaults$prop_immune_younger, step = 0.01),
-                 sliderInput("prop_immune_younger2", "Proportion immune (5-18 yrs)",
-                             min = 0, max = 1, value = defaults$prop_immune_younger2, step = 0.01),
-                 sliderInput("prop_immune_older", "Proportion immune (19-64 yrs)",
-                             min = 0, max = 1, value = defaults$prop_immune_older, step = 0.01),
-                 sliderInput("prop_immune_oldest", "Proportion immune (65+ yrs)",
-                             min = 0, max = 1, value = defaults$prop_immune_oldest, step = 0.01),
-                 
-                 hr(),
-                 h4("Symptomatic fraction by age-groups"),
-                 sliderInput("symp_1", "Symptomatic frac (0-4 yrs)", min = 0, max = 1, value = defaults$symp_1, step = 0.01),
-                 sliderInput("symp_2", "Symptomatic frac (5-18 yrs)", min = 0, max = 1, value = defaults$symp_2, step = 0.01),
-                 sliderInput("symp_3", "Symptomatic frac (19-64 yrs)", min = 0, max = 1, value = defaults$symp_3, step = 0.01),
-                 sliderInput("symp_4", "Symptomatic frac (65+ yrs)", min = 0, max = 1, value = defaults$symp_4, step = 0.01),
+                 div(class = "compact-sidebar",
+                     
+                     actionButton("run_model", "Run Model"),
+                     hr(),
+                     
+                     fileInput("file", 
+                               "[Optional] Upload custom data as a csv file. See About tab for format.", 
+                               accept = ".csv"),
+                     hr(),
+                     
+                     # single combined download
+                     downloadButton("download_all", "Download results (zip)"),
+                     hr(),
+                     
+                     # ---- Collapsible sections ----
+                     accordion(
+                       open = c("Model parameters (core)"),
+                       id = "sidebar_accordion",
+                       
+                       # ---- Core parameters ----
+                       accordion_panel(
+                         title = "Model parameters (core)",
+                         numericInput("R0", "Basic reproductive number R0", value = defaults$R0, step = 0.01),
+                         numericInput("gamma", "Infectious period (days) gamma", value = defaults$gamma, step = 0.1),
+                         br(),
+                         
+                         sliderInput("overall_immune_escape", "Overall immune escape (multiplier on immunity - lower value means more antigenic drift )",
+                                     min = 0, max = 2, value = defaults$overall_immune_escape, step = 0.01),
+                         
+                         
+                         numericInput("seed_size", "Seed size (number of initial infections)", 
+                                      value = defaults$seed_size, step = 10),
+                         br(),
+                         
+                         sliderInput("sim_start_date", "Seed date",
+                                     min = as.Date("2022-07-01"),
+                                     max = as.Date("2022-12-31"),
+                                     value = defaults$sim_start_date,
+                                     timeFormat = "%b-%d"),
+                         sliderInput("sim_end_date", "Simulation end date",
+                                     min = as.Date("2023-01-01"),
+                                     max = as.Date("2023-07-01"),
+                                     value = defaults$sim_end_date,
+                                     timeFormat = "%b-%d"),
+                         br(),
+                         
+                         sliderInput("reporting_rate", "Reporting rate (fraction of symptomatic reported)",
+                                     min = 0, max = 0.01, value = defaults$reporting_rate, step = 0.0001),
+                         br(),
+                         numericInput("initial_immune_frac", "Initial proportion of the population fully immune", value = defaults$initial_immune_frac, step = 0.01),
+                         numericInput("alpha2", "Relative susceptibility of immune class", value = defaults$alpha2, step = 0.05)
+                       ),
+                       
+                       hr(),
+                       
+                       # ---- Plot options (matches defaults$Plot options tab) ----
+                       accordion_panel(
+                         title = "Plot options",
+                         numericInput("y_lim_max", "Maximum y-axis value", value = defaults$y_lim_max, step = 100),
+                         numericInput("growth_y_scale", "Growth plot y-scale (symmetric)", value = defaults$growth_y_scale, step = 0.1),
+                         sliderInput("plot_start_date", "Plot start date",
+                                     min = as.Date("2022-07-01"),
+                                     max = as.Date("2022-12-31"),
+                                     value = defaults$plot_start_date,
+                                     timeFormat = "%b-%d")
+                       ),
+                       hr(),
+                       
+                       
+                       
+                       # ---- Contact patterns ----
+                       accordion_panel(
+                         title="Demographics & Contact patterns",
+                         
+                         sliderInput("N_tot", "Population Size",
+                                     min = 10e6,
+                                     max = 150e6,
+                                     value = defaults$N_tot),
+                         
+                         h5("School holiday contacts"),
+                         sliderInput("prop_home_contacts_in_hols", "Multiplier for home contacts in breaks",
+                                     min = 0, max = 3, value = defaults$prop_home_contacts_in_hols, step = 0.01),
+                         sliderInput("prop_work_contacts_in_hols", "Proportion of work contacts kept in school holidays",
+                                     min = 0, max = 1, value = defaults$prop_work_contacts_in_hols, step = 0.01),
+                         sliderInput("prop_rest_contacts_in_hols", "Multiplier for non-school or work contacts in breaks",
+                                     min = 0.5, max = 3, value = defaults$prop_rest_contacts_in_hols, step = 0.01),
+                         hr(),
+                         h5("Christmas period contacts (before school holiday)"),
+                         sliderInput("prop_all_contacts_christmas", "Multiplier for all non-school contacts in Christmas period",
+                                     min = 0.5, max = 3, value = defaults$prop_all_contacts_christmas, step = 0.01),
+                         hr(),
+                         h5("Christmas holiday contacts"),
+                         sliderInput("prop_rest_contacts_in_christmas", "Proportion of all contacts kept over Christmas",
+                                     min = 0, max = 1, value = defaults$prop_rest_contacts_in_christmas, step = 0.01),
+                         sliderInput("prop_home_contacts_in_christmas", "Multiplier for home contacts over Christmas holiday",
+                                     min = 1, max = 5, value = defaults$prop_home_contacts_in_christmas, step = 0.01)
+                       ),
+                       
+                       hr(),
+                       
+                       # ---- Immunity and disease ----
+                       accordion_panel(
+                         title="Immunity and disease",
+                         sliderInput("prop_immune_younger", "Proportion immune (0-4 yrs)",
+                                     min = 0, max = 1, value = defaults$prop_immune_younger, step = 0.01),
+                         sliderInput("prop_immune_younger2", "Proportion immune (5-18 yrs)",
+                                     min = 0, max = 1, value = defaults$prop_immune_younger2, step = 0.01),
+                         sliderInput("prop_immune_older", "Proportion immune (19-64 yrs)",
+                                     min = 0, max = 1, value = defaults$prop_immune_older, step = 0.01),
+                         sliderInput("prop_immune_oldest", "Proportion immune (65+ yrs)",
+                                     min = 0, max = 1, value = defaults$prop_immune_oldest, step = 0.01),
+                         
+                         hr(),
+                         h4("Symptomatic fraction by age-groups"),
+                         sliderInput("symp_1", "Symptomatic frac (0-4 yrs)", min = 0, max = 1, value = defaults$symp_1, step = 0.01),
+                         sliderInput("symp_2", "Symptomatic frac (5-18 yrs)", min = 0, max = 1, value = defaults$symp_2, step = 0.01),
+                         sliderInput("symp_3", "Symptomatic frac (19-64 yrs)", min = 0, max = 1, value = defaults$symp_3, step = 0.01),
+                         sliderInput("symp_4", "Symptomatic frac (65+ yrs)", min = 0, max = 1, value = defaults$symp_4, step = 0.01)
+                       )
+                     )
+                 ),
                  
                  width = 3
                ),
+               
                mainPanel(
                  fluidRow(
                    column(12,
