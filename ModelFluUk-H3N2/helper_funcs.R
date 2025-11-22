@@ -122,9 +122,12 @@ build_incidence_plot <- function(res, input, flu_dat, last_scenario) {
     flu_subset_dat <- as.data.frame(last_scenario$inc)
     flu_subset_dat$t <- 1:nrow(flu_subset_dat)
     flu_subset_dat <- flu_subset_dat %>% pivot_longer(-t)
-    colnames(flu_subset_dat) <- c("date","age_group","ILI_flu")
+    colnames(flu_subset_dat) <- c("t","age_group","ILI_flu")
+    flu_subset_dat <- flu_subset_dat %>% left_join(date_key)
     flu_subset_dat$age_group <- age_group_key[flu_subset_dat$age_group]
     flu_subset_dat$age_group <- factor(flu_subset_dat$age_group, levels = age_group_key)
+    print("************")
+    print(flu_subset_dat)
     
   } else{
     

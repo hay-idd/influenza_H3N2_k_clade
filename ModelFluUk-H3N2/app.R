@@ -419,12 +419,11 @@ server <- function(input, output, session) {
          meta = meta)
   }) # end run_model
   
+  scenario_snapshot <- reactiveVal(NULL)
   
-  last_scenario <- reactive({
-    if (input$set_ref == 0) {
-      return(NULL)
-    }
-    run_model()
+  # Update ONLY when button is clicked
+  observeEvent(input$set_ref, {
+    scenario_snapshot(run_model()) 
   })
   
   
@@ -473,10 +472,12 @@ server <- function(input, output, session) {
     if (isTRUE(res$error)) {
       plot.new(); text(0.5, 0.5, res$message); return()
     }
+    
+    last_scenario <- scenario_snapshot()
     combined <- build_combined_plot(res, 
                                     input, 
                                     flu_dat(),
-                                    last_scenario())
+                                    last_scenario)
     print(combined)
   })
   
