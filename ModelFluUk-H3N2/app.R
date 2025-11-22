@@ -97,7 +97,8 @@ ui <- fluidPage(
                          numericInput("gamma", "Infectious period (days) gamma", value = defaults$gamma, step = 0.1),
                          br(),
                          
-                         sliderInput("overall_immune_escape", "Overall immune escape (multiplier on immunity - lower value means more antigenic drift )",
+                         sliderInput("overall_immune_escape", 
+                                     "Overall immune escape (multiplier on immunity - lower value means more antigenic drift )",
                                      min = 0, max = 2, value = defaults$overall_immune_escape, step = 0.01),
                          
                          

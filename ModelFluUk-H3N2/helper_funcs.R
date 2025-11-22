@@ -123,11 +123,12 @@ build_incidence_plot <- function(res, input, flu_dat, last_scenario) {
     flu_subset_dat$t <- 1:nrow(flu_subset_dat)
     flu_subset_dat <- flu_subset_dat %>% pivot_longer(-t)
     colnames(flu_subset_dat) <- c("t","age_group","ILI_flu")
-    flu_subset_dat <- flu_subset_dat %>% left_join(date_key)
+    
+    last_date_key <- last_scenario$date_key
+    flu_subset_dat <- flu_subset_dat %>% left_join(last_date_key)
     flu_subset_dat$age_group <- age_group_key[flu_subset_dat$age_group]
     flu_subset_dat$age_group <- factor(flu_subset_dat$age_group, levels = age_group_key)
-    print("************")
-    print(flu_subset_dat)
+    ref_name <- "Custom scenario"
     
   } else{
     
@@ -135,6 +136,7 @@ build_incidence_plot <- function(res, input, flu_dat, last_scenario) {
     flu_subset_dat <- flu_dat %>% filter(date >= res$meta$start_date, date <= res$meta$end_date)
     flu_subset_dat$age_group <- age_group_key1[flu_subset_dat$age_group]
     flu_subset_dat$age_group <- factor(flu_subset_dat$age_group, levels = age_group_key1)
+    ref_name = "2022/23 season data"
 
   }
   
@@ -149,6 +151,9 @@ build_incidence_plot <- function(res, input, flu_dat, last_scenario) {
   y_pos <- res$meta$y_lim_max * 0.95
   rects$y <- y_pos
   
+  lt_values <- c("dashed", "solid")
+  names(lt_values) <- c(ref_name, "Model")
+  
   p <- ggplot(inc %>% left_join(date_key)) +
     geom_rect(data = rects, aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = fill),
               inherit.aes = FALSE, alpha = 0.25, show.legend = TRUE) +
@@ -156,13 +161,13 @@ build_incidence_plot <- function(res, input, flu_dat, last_scenario) {
               size = 3, fontface = "bold", vjust = 1) +
     
     geom_line(data = flu_subset_dat, 
-              aes(x = date, y = ILI_flu, col = age_group, linetype = "2022/23 season data"),
+              aes(x = date, y = ILI_flu, col = age_group, linetype = ref_name),
               alpha = 0.5, linewidth = 1) +
     
     geom_line(aes(x = date, y = incidence, col = age_group, linetype = "Model"), linewidth = 1) +
     scale_color_brewer("Age group", palette = "Set1") +
     scale_fill_brewer("Holiday period", palette = "Set2") +
-    scale_linetype_manual("Data source", values = c("2022/23 season data" = "dashed", "Model" = "solid")) +
+    scale_linetype_manual("Data source", values = lt_values) +
     scale_x_date(breaks = "1 month", date_labels = "%b-%d", expand = c(0, 0)) +
     scale_y_continuous(expand = c(0, 0)) +
     coord_cartesian(ylim = c(0, res$meta$y_lim_max), xlim = c(res$meta$plot_start_date, res$meta$end_date)) +
