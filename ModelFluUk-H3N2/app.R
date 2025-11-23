@@ -120,13 +120,6 @@ ui <- fluidPage(
                          
                          sliderInput("reporting_rate", "Reporting rate (fraction of symptomatic reported)",
                                      min = 0, max = 0.01, value = defaults$reporting_rate, step = 0.0001)
-                         
-                         # numericInput("initial_immune_frac", 
-                         #              "Initial proportion of the population fully immune", 
-                         #              value = defaults$initial_immune_frac, step = 0.01),
-                         # numericInput("alpha2", 
-                         #              "Relative susceptibility of immune class", 
-                         #              value = defaults$alpha2, step = 0.05)
                        ),
                        
                        hr(),
@@ -229,7 +222,14 @@ ui <- fluidPage(
              fluidRow(
                column(9,
                       h3("About this model"),
-                      p("Placeholder: description of the model and data goes here. (You can edit this later.)"),
+                      p("
+                        
+                        "),
+                      br(),
+                      br(),
+                      h3("Default reference data (dashed lines on the plot labelled 2022/23)."),
+                      p("The last flu season in which H3N2 was the dominant strain occured in 2022/23. We have used publicly available data for England in this season sourced from the Royal College of General Practicioners (RCGP) website: https://www.rcgp.org.uk/representing-you/research-at-rcgp/research-surveillance-centre/public-health-data. If you wish to modify the reference data to a custom dataset, please use the format shown below, then upload your csv in the link provided on the sidebar. Alternatively you can use the model to generate a new scenario and then set that as the new reference by clicking the button in the sidebar."),
+                      br(),
                       br(),
                       h3("Format for custom CSV file."),
                       p("Please ensure your file conforms to the following format."),
