@@ -2,6 +2,9 @@
 library(tidyverse)
 library(socialmixr)
 library(data.table)
+library(pracma)
+library(deSolve)
+library(patchwork)
 setwd("~/Documents/GitHub/influenza_H3N2_k_clade/shiny_app/")
 # ---- SOURCE helper files (must exist in same project) ----
 source("auxiliary_funcs.R")   # contains setup_period_tibble, setup_holiday_tibble, etc.
@@ -222,7 +225,17 @@ for (i in seq_along(R0_vals)) {
               i, length(R0_vals),params$R0))
   
   res <- run_model_once(params)
-  results_list[[i]] <- res$metrics
+  tmp_gr <- res$res$weekly_growth_rate_total %>% rename(t=time)
+  tmp_gr <- tmp_gr %>% left_join(res$res$date_key) %>% 
+    mutate(month = month(date)) %>%
+    filter(month == 11) %>%
+    filter(date == min(date)) %>%
+    ## Find earliest date in November
+    select(-c(t,inc, month)) %>%
+    rename(gr_early_nov=gr,nov_date=date)
+  
+  results_list[[i]] <- bind_cols(res$metrics,tmp_gr)
+  ## Pull out growth rates on 1st Oct, 1st Nov, and 1st Dec
 }
 results_tbl_R0 <- bind_rows(results_list)
 
@@ -236,7 +249,16 @@ for (i in seq_along(seed_vals)) {
               i, length(seed_vals),params$sim_start_date))
   
   res <- run_model_once(params)
-  results_list[[i]] <- res$metrics
+  tmp_gr <- res$res$weekly_growth_rate_total %>% rename(t=time)
+  tmp_gr <- tmp_gr %>% left_join(res$res$date_key) %>% 
+    mutate(month = month(date)) %>%
+    filter(month == 11) %>%
+    filter(date == min(date)) %>%
+    ## Find earliest date in November
+    select(-c(t,inc, month)) %>%
+    rename(gr_early_nov=gr,nov_date=date)
+  
+  results_list[[i]] <- bind_cols(res$metrics,tmp_gr)
 }
 results_tbl_seed <- bind_rows(results_list)
 
@@ -250,7 +272,15 @@ for (i in seq_along(overall_escape_vals)) {
               i, length(overall_escape_vals),params$overall_immune_escape))
   
   res <- run_model_once(params)
-  results_list[[i]] <- res$metrics
+  tmp_gr <- res$res$weekly_growth_rate_total %>% rename(t=time)
+  tmp_gr <- tmp_gr %>% left_join(res$res$date_key) %>% 
+    mutate(month = month(date)) %>%
+    filter(month == 11) %>%
+    filter(date == min(date)) %>%
+    ## Find earliest date in November
+    select(-c(t,inc, month)) %>%
+    rename(gr_early_nov=gr,nov_date=date)
+  results_list[[i]] <- bind_cols(res$metrics,tmp_gr)
 }
 results_tbl_escape <- bind_rows(results_list)
 
@@ -267,84 +297,152 @@ for (i in seq_along(overall_escape_vals)) {
               i, length(overall_escape_vals),overall_escape_vals[i]))
   
   res <- run_model_once(params)
-  results_list[[i]] <- res$metrics
+  tmp_gr <- res$res$weekly_growth_rate_total %>% rename(t=time)
+  tmp_gr <- tmp_gr %>% left_join(res$res$date_key) %>% 
+    mutate(month = month(date)) %>%
+    filter(month == 11) %>%
+    filter(date == min(date)) %>%
+    ## Find earliest date in November
+    select(-c(t,inc, month)) %>%
+    rename(gr_early_nov=gr,nov_date=date)
+  results_list[[i]] <- bind_cols(res$metrics,tmp_gr)
   results_list[[i]]$index <- overall_escape_vals[i]
 }
 results_tbl_young_escape <- bind_rows(results_list)
 
 ## Create data for varying R0
-results_tbl_R0_long <- results_tbl_R0 %>% mutate(Scenario = "R0") %>% select(R0, estimated_peak_symptomatic, final_size_infections, final_size_65plus, Scenario) %>% rename(variable=R0) %>% 
+results_tbl_R0_long <- results_tbl_R0 %>% mutate(Scenario = "R0") %>% select(R0, estimated_peak_symptomatic, final_size_infections, final_size_65plus,gr_early_nov,
+ Scenario) %>% rename(variable=R0) %>% 
   mutate(estimated_peak_symptomatic = 100000*estimated_peak_symptomatic/60000000) %>%
   rename(`Final size`=final_size_infections,
          `Final size 65+`=final_size_65plus,
-         `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic) %>%
+         `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic,
+         `November week 1 growth rate`=gr_early_nov) %>%
   pivot_longer(-c(variable,Scenario))
 
 ## Create data for varying Seed time
-results_tbl_seed_long <- results_tbl_seed %>% mutate(Scenario = "Seed time") %>% select(sim_start_date, estimated_peak_symptomatic, final_size_infections, final_size_65plus, Scenario) %>% rename(variable=sim_start_date) %>% 
+results_tbl_seed_long <- results_tbl_seed %>% mutate(Scenario = "Seed time") %>% select(sim_start_date, estimated_peak_symptomatic, final_size_infections, final_size_65plus, gr_early_nov, Scenario) %>% rename(variable=sim_start_date) %>% 
   mutate(estimated_peak_symptomatic = 100000*estimated_peak_symptomatic/60000000) %>%
   rename(`Final size`=final_size_infections,
          `Final size 65+`=final_size_65plus,
-         `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic) %>%
+         `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic,
+         `November week 1 growth rate`=gr_early_nov) %>%
   pivot_longer(-c(variable,Scenario))
 
 
 ## Create data for varying Overall immune escape
-results_tbl_escape_long <- results_tbl_escape %>% mutate(Scenario = "Immune escape") %>% select(overall_immune_escape, estimated_peak_symptomatic, final_size_infections, final_size_65plus, Scenario) %>% rename(variable=overall_immune_escape) %>% 
+results_tbl_escape_long <- results_tbl_escape %>% mutate(Scenario = "Immune escape") %>% select(overall_immune_escape, estimated_peak_symptomatic, final_size_infections, final_size_65plus, gr_early_nov,  Scenario) %>% rename(variable=overall_immune_escape) %>% 
   mutate(estimated_peak_symptomatic = 100000*estimated_peak_symptomatic/60000000) %>%
   rename(`Final size`=final_size_infections,
          `Final size 65+`=final_size_65plus,
-         `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic) %>%
+         `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic,
+         `November week 1 growth rate`=gr_early_nov) %>%
   pivot_longer(-c(variable,Scenario))
 
 ## Create data for varying Immune escape in younger ages
-results_tbl_young_escape_long <- results_tbl_young_escape %>% mutate(Scenario = "Immune escape in children") %>% select(index, estimated_peak_symptomatic, final_size_infections, final_size_65plus, Scenario) %>% rename(variable=index) %>% 
+results_tbl_young_escape_long <- results_tbl_young_escape %>% mutate(Scenario = "Immune escape in children") %>% select(index, estimated_peak_symptomatic, final_size_infections, final_size_65plus,gr_early_nov,  Scenario) %>% rename(variable=index) %>% 
   mutate(estimated_peak_symptomatic = 100000*estimated_peak_symptomatic/60000000) %>%
   rename(`Final size`=final_size_infections,
          `Final size 65+`=final_size_65plus,
-         `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic) %>%
+         `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic,
+         `November week 1 growth rate`=gr_early_nov) %>%
   pivot_longer(-c(variable,Scenario))
 
 
+## Read in estimated growth rates from RCGP and WHO FluNet
+gr_flunet <- read_csv("../results/flunet_h3_growth_rates.csv") %>% filter(season=='2025/26') %>%
+  mutate(month = month(date)) %>% filter(month %in% c(11)) %>% group_by(month) %>% filter(date == min(date)) %>%
+  select(y,lb_95,ub_95) %>% mutate(Dataset="WHO FluNet") %>%
+  
+  mutate(Label="WHO FluNet") %>%
+  mutate(name = "November week 1 growth rate")
+
+rcgp_dat <- read_csv("../results/RCGP_growth_rates_by_age.csv") %>% filter(agegroup=="All",Season=='2025 to 2026') %>%
+  mutate(month = month(date)) %>% filter(month %in% c(11)) %>% group_by(month) %>% filter(date == min(date)) %>%
+  select(y,lb_95,ub_95) %>% mutate(Dataset="RCGP") %>% 
+  mutate(Label="RCGP") %>%
+  mutate(name = "November week 1 growth rate")
+
+
+gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)
+gr_est_dat$x <- c(3,3.5)
+
 p_r0 <- ggplot(results_tbl_R0_long) +
   geom_line(aes(x=variable, y=value, color=name)) +
-  facet_wrap(~name,scales="free_y") +
+  geom_hline(data=gr_est_dat,aes(yintercept=y,linetype=Dataset)) +
+  geom_pointrange(data=gr_est_dat,aes(y=y,ymin=lb_95,ymax=ub_95,group=Dataset,x=x,col=Label),linewidth=0.5,size=0.25) +
+  #geom_text(data=gr_est_dat,aes(y=y + 0.04,label=Label,x=x2),size=3,hjust=0) +
+  facet_wrap(~name,scales="free_y",nrow=1) +
   xlab("R0") +
   ylab("Value") +
-  scale_color_brewer("Metric", palette="Set1") +
+  scale_color_brewer("Metric", palette="Set2") +
+  scale_linetype_manual(values=c("WHO FluNet"="dashed","RCGP"="dotted")) +
   theme_bw() +
   theme(legend.position="bottom")
+p_r0
 
+gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)
+gr_est_dat$x <- c(0.7,0.8)
 
+#gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)%>% mutate(x1=if_else(Dataset=="WHO FluNet",0.7,0.8)) %>% mutate(x2 = if_else(Dataset=="WHO FluNet",.05,.05))
 
 p_escape <- ggplot(results_tbl_escape_long) +
   geom_line(aes(x=variable, y=value, color=name)) +
-  facet_wrap(~name,scales="free_y") +
-  xlab("Proportion immune escape\n(1 is no immune escape)") +
+  geom_hline(data=gr_est_dat,aes(yintercept=y,linetype=Dataset)) +
+  geom_pointrange(data=gr_est_dat,aes(y=y,ymin=lb_95,ymax=ub_95,group=Dataset,x=x,col=Label),linewidth=0.5,size=0.25,alpha=1) +
+  #geom_text(data=gr_est_dat,aes(y=y + 0.04,label=Dataset,x=x2),size=3,hjust=0) +
+  
+  facet_wrap(~name,scales="free_y",nrow=1) +
+  xlab("Proportion immune relative\n to baseline") +
+  scale_linetype_manual(values=c("WHO FluNet"="dashed","RCGP"="dotted")) +
   ylab("Value") +
-  scale_color_brewer("Metric", palette="Set1") +
+  scale_color_brewer("Metric", palette="Set2") +
   theme_bw() +
   theme(legend.position="bottom")
+p_escape
 
+
+gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)
+gr_est_dat$x <- c(0.7,0.8)
+#gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)%>% mutate(x1=if_else(Dataset=="WHO FluNet",0.7,0.8)) %>% mutate(x2 = if_else(Dataset=="WHO FluNet",.05,.05))
 p_escape_young <- ggplot(results_tbl_young_escape_long) +
   geom_line(aes(x=variable, y=value, color=name)) +
-  facet_wrap(~name,scales="free_y") +
-  xlab("Proportion immune escape in <18\n(1 is no immune escape)") +
+  geom_hline(data=gr_est_dat,aes(yintercept=y,linetype=Dataset)) +
+  geom_pointrange(data=gr_est_dat,aes(y=y,ymin=lb_95,ymax=ub_95,group=Dataset,x=x,col=Label),linewidth=0.5,size=0.25,alpha=1) +
+  
+#  geom_text(data=gr_est_dat,aes(y=y + 0.04,label=Dataset,x=x2),size=3,hjust=0) +
+  
+  facet_wrap(~name,scales="free_y",nrow=1) +
+  xlab("Proportion immune relative\n to baseline in <18") +
   ylab("Value") +
-  scale_color_brewer("Metric", palette="Set1") +
+  scale_color_brewer("Metric", palette="Set2") +
+  scale_linetype_manual(values=c("WHO FluNet"="dashed","RCGP"="dotted")) +
   theme_bw() +
   theme(legend.position="bottom")
+p_escape_young
+
+
+gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)
+gr_est_dat$x <- c(as.Date("2022-10-01"),as.Date("2022-10-15"))
+#gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)%>% 
+#  mutate(x1=if_else(Dataset=="WHO FluNet",as.Date("2022-10-01"),as.Date("2022-10-15"))) %>%
+#  mutate(x2 = if_else(Dataset=="WHO FluNet",as.Date("2022-08-01"),as.Date("2022-08-01")))
 
 p_seed <- ggplot(results_tbl_seed_long) +
   geom_line(aes(x=variable, y=value, color=name)) +
-  facet_wrap(~name,scales="free_y") +
+  geom_hline(data=gr_est_dat,aes(yintercept=y,linetype=Dataset)) +
+  geom_pointrange(data=gr_est_dat,aes(y=y,ymin=lb_95,ymax=ub_95,group=Dataset,x=x,col=Label),linewidth=0.5,size=0.25,alpha=1) +
+  #geom_text(data=gr_est_dat,aes(y=y + 0.04,label=Dataset,x=x2),size=3,hjust=0) +
+  
+  facet_wrap(~name,scales="free_y",nrow=1) +
   xlab("Seed date (1000 infections)") +
   ylab("Value") +
-  scale_color_brewer("Metric", palette="Set1") +
+  scale_color_brewer("Metric", palette="Set2") +
+  scale_linetype_manual(values=c("WHO FluNet"="dashed","RCGP"="dotted")) +
   theme_bw() +
   theme(legend.position="bottom")
-
+p_seed
 p_main <- p_r0/p_escape/p_escape_young/p_seed + plot_layout(guides="collect")&
   theme(legend.position='none')
 
-ggsave("~/Documents/GitHub/influenza_H3N2_k_clade/figures/fig_model_grid_results.png", p_main, width=8, height=10)
+ggsave("~/Documents/GitHub/influenza_H3N2_k_clade/figures/fig_model_grid_results.png", p_main, width=10, height=10)

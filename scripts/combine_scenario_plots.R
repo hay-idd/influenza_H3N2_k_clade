@@ -181,9 +181,122 @@ p <- ggplot() +
   scale_y_continuous(breaks=seq(0,10000,by=1000)) +
   coord_cartesian(expand = TRUE,xlim=as.Date(c("2022-09-01","2023-02-01")))
 p
+
 # Save
 ggsave(paste0(save_wd,out_png), p, width = 9, height = 11, dpi = 300)
 message("Saved combined plot: ", out_png)
+
+## Pull out just over 65
+p_65 <- ggplot() +
+  geom_rect(data = rects_df %>% filter(Scenario == "I. Two weeks earlier seeding and 5% immune escape"), aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = fill),
+            inherit.aes = FALSE, alpha = 0.25) +
+  geom_line(data = combined_inc%>% filter(age_group == "65+") %>% filter(Scenario != "I. Two weeks earlier seeding and 5% immune escape"), aes(x = date, y = incidence, color = Scenario, group = Scenario), size = 0.9) +
+  scale_color_brewer("Scenario", palette = "Set3") +
+  scale_fill_brewer("Holiday period", palette = "Set2") +
+  theme_bw() +
+  labs(x = "Date", y = "Reported symptomatic influenza (weekly)") +
+  guides(
+    color = guide_legend(order = 1),
+    fill  = guide_legend(order = 2)
+  ) +
+  scale_y_continuous(expand=c(0,0),limits=c(0,1400),breaks=seq(0,1400,by=200)) +
+  theme(
+    strip.text = element_text(size = 10),
+    axis.text.x = element_text(size=10),
+    legend.position = "right",
+    plot.margin = margin(20, 20, 20, 20, "pt"),
+    legend.box = "vertical",              # <-- stack legends vertically
+    legend.spacing.y = unit(4, "pt"),     # <-- spacing between legend boxes
+    panel.spacing.x = unit(1, "cm")       # (your earlier spacing adjustment)
+  ) +
+  coord_cartesian(expand = TRUE,xlim=as.Date(c("2022-09-01","2023-02-01")))
+
+out_png_65 <- "combined_65.png"
+ggsave(paste0(save_wd,out_png_65), p_65, width = 10, height = 5, dpi = 300)
+
+## Plot growth rates
+all_p2_data <- list()
+for (fld in folders) {
+  print(fld)
+  rfiles <- list.files(fld, pattern = "\\.RData$", full.names = TRUE)
+  if (length(rfiles) == 0) next
+  e <- new.env()
+  load(rfiles[[1]], envir = e)
+  if (!exists("p2", envir = e)) next
+  p2 <- get("p2", envir = e)
+  df <- p2$data
+  scen <- basename(fld)
+  df <- df %>% mutate(Scenario = scen)
+  all_p2_data[[scen]] <- df
+}
+if (length(all_p2_data)) {
+  combined_p2 <- bind_rows(all_p2_data)
+  # convert numeric x back to Date if necessary (ggplot may have converted Date -> numeric)
+  if ("x" %in% names(combined_p2) && is.numeric(combined_p2$x)) {
+    combined_p2 <- combined_p2 %>% mutate(x = as.Date(x, origin = "1970-01-01"))
+  }
+} else {
+  combined_p2 <- tibble()
+}
+
+ggplot(combined_p2) + geom_line(aes(x=t,y=log_growth,col=age_group)) + facet_wrap(~Scenario)
+
+# ensure age_group factor ordering (shared)
+age_levels <- c("[0,5)","[5,18)","[18,65)","65+")
+combined_inc$age_group <- factor(combined_inc$age_group, levels = age_levels)
+
+# ---- align/annotate combined_p2 with combined_inc (dates), factor levels and scenario labels ----
+# ensure t -> date mapping (use combined_inc as the canonical map of Scenario + t -> date)
+
+# ensure age_group factor ordering (shared with combined_inc)
+age_levels <- c("[0,5)","[5,18)","[18,65)","65+")
+if ("age_group" %in% names(combined_p2)) combined_p2$age_group <- factor(combined_p2$age_group, levels = age_levels)
+
+# apply scenario label mapping (fall back to original if no mapping)
+label_map <- scenario_labels
+if ("Scenario" %in% names(combined_p2)) {
+  combined_p2 <- combined_p2 %>%
+    mutate(Scenario = as.character(Scenario),
+           Scenario = ifelse(Scenario %in% names(label_map), label_map[Scenario], Scenario),
+           Scenario = factor(Scenario, levels = unname(label_map)))
+}
+
+# ---- plot: mimic style of `p` (colour palette, line size, facet layout, legend placement) ----
+p_from_p2 <- ggplot(combined_p2 %>% filter(!is.na(date) & !is.na(log_growth)) %>%
+                      filter(Scenario != "I. Two weeks earlier seeding and 5% immune escape"), 
+                    aes(x = date, y = log_growth, colour = age_group, group = age_group)) +
+  geom_rect(data = rects_df %>% filter(Scenario != "I. Two weeks earlier seeding and 5% immune escape"), aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = fill),
+            inherit.aes = FALSE, alpha = 0.25) +
+  geom_hline(yintercept=0, linetype = "dashed", color = "black") +
+  geom_line(size = 0.9, na.rm = TRUE) +
+  facet_wrap(~ Scenario, ncol = ncol_out) +
+  scale_color_brewer("Age group", palette = "Set1") +
+  scale_fill_brewer("Holiday period", palette = "Set2") +
+  
+  scale_y_continuous(breaks=seq(-1,2,by=0.5))+
+  coord_cartesian(ylim=c(-1.2,2))+
+  scale_x_date(date_labels = "%b", date_breaks = "1 month") +
+  theme_bw() +
+  labs(x = "Date", y = "Growth rate (log)") +  guides(
+    color = guide_legend(order = 1),
+    fill  = guide_legend(order = 2)
+  ) +
+  theme(
+    strip.text = element_text(size = 10),
+    axis.text.x = element_text(size = 10),
+    legend.position = "bottom",
+    legend.box = "vertical",
+    legend.spacing.y = unit(4, "pt"),
+    panel.spacing.x = unit(1, "cm")
+  )
+
+print(p_from_p2)
+out_png <- "combined_growth_rates.png"
+ggsave(paste0(save_wd,out_png), p_from_p2, width = 9, height = 11, dpi = 300)
+
+
+
+
 
 # --- Clean all quotes from Scenario & label ---
 annots_clean <- annots_df %>%

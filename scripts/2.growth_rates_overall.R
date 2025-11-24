@@ -329,10 +329,10 @@ raw_data$agegroup <- factor(raw_data$agegroup, levels=c("All","1-4","5-14","15-4
 tmp_dat_all <- tmp_dat_all %>% left_join(time_key) %>% distinct()
 ## Plot overall GR and by age
 p_gr_by_age <- ggplot(tmp_dat_all) + 
-  geom_rect(data = rects %>% filter(!(label %like% "Half-term Oct")), inherit.aes = FALSE,
+  geom_rect(data = rects %>% filter(!(label %like% "Half-term Oct" & acad_year == "2025/26")), inherit.aes = FALSE,
             aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),fill="grey70",
             alpha = 0.4) +  
-  geom_rect(data = rects %>% filter((label %like% "Half-term Oct")), inherit.aes = FALSE,
+  geom_rect(data = rects %>% filter((label %like% "Half-term Oct" & acad_year == "2025/26")), inherit.aes = FALSE,
             aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),fill="red",
             alpha = 0.4) +  
   geom_hline(yintercept=0,linetype="dashed") +
@@ -381,6 +381,7 @@ tmp_dat_shifted <-  tmp_dat_all %>%
   mutate(time_plot = time_rel - max_week)
 
 
+
 p_gr_by_age_shifted_rel <- ggplot(tmp_dat_shifted) + 
   geom_hline(yintercept=0,linetype="dashed") +
   geom_ribbon(aes(x=time_plot,ymin=lb_95,ymax=ub_95,fill=Season),alpha=0.5) +
@@ -412,11 +413,15 @@ p_gr_by_age_diff <- ggplot(tmp_dat_all %>% filter(!(agegroup %in% c("15-44","All
   theme(legend.position="bottom",legend.direction="horizontal")
 
 ## Compare growth rates by age to the 15-44 group, by date of season
+## Pull out peak difference and date
+tmp_dat_all %>% filter(!(agegroup %in% c("15-44","All")),Season != "2022 to 2023") %>%
+  left_join(tmp_dat_all %>% filter(agegroup == "15-44") %>% select(time_rel,Season,y) %>% rename(y_15_44 = y))%>% group_by(Season) %>%mutate(time = time - min(time)) %>% group_by(Season, agegroup) %>% mutate(diff = y - y_15_44) %>% filter(diff == max(diff)) %>% arrange(Season, agegroup) %>% select(Season, agegroup, diff) %>% pivot_wider(names_from=agegroup, values_from= c(diff)) %>% write.csv("results/peak_growth_rate_differences_by_age_rcgp.csv")
+
 p_gr_by_age_diff_season <- ggplot(tmp_dat_all %>% filter(!(agegroup %in% c("15-44","All")),Season != "2022 to 2023") %>%
-                             left_join(tmp_dat_all %>% filter(agegroup == "15-44") %>% select(time_rel,Season,y) %>% rename(y_45_64 = y))%>% group_by(Season) %>%mutate(time = time - min(time))) + 
+                             left_join(tmp_dat_all %>% filter(agegroup == "15-44") %>% select(time_rel,Season,y) %>% rename(y_15_44 = y))%>% group_by(Season) %>%mutate(time = time - min(time))) + 
   geom_hline(yintercept=0,linetype="dashed") +
   #geom_ribbon(aes(x=date,ymin=lb_95 - y_45_64,ymax=ub_95 - y_45_64,fill=agegroup),alpha=0.5) +
-  geom_line(aes(x=time_rel,y=y - y_45_64,col=Season,group=interaction(agegroup,Season)),linewidth=0.75) +
+  geom_line(aes(x=time_rel,y=y - y_15_44,col=Season,group=interaction(agegroup,Season)),linewidth=0.75) +
   #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
   scale_fill_brewer("Season", palette = "Set1") +
   scale_color_brewer("Season", palette = "Set1") +
@@ -613,16 +618,31 @@ p_gr_flunet_by_day<- ggplot(data=gr_flunet_dat) +
 
 
 ## Align by peak data
-max_gr <- gr_flunet_dat %>% group_by(season) %>% filter(y == max(y)) %>% select(season, day_of_year) %>% rename(peak_time = day_of_year)
-gr_flunet_dat <- gr_flunet_dat %>% left_join(max_gr)
+## Filter gr_flunet_dat to be between September and May each season
+gr_flunet_dat1 <- gr_flunet_dat %>%
+  filter(month(date) >= 9 | month(date) <= 4 | (month(date) == 5 & day(date) <= 1)) %>%
+  group_by(season) %>%
+  slice_max(y, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+max_gr <- gr_flunet_dat1 %>% group_by(season) %>% filter(y == max(y))# %>% select(season, day_of_year) %>% rename(peak_time = day_of_year)
+
+max_gr %>% select(season, Year, Week, date, y, lb_95, ub_95) %>% arrange(season) %>% tail(5) %>% print()
+
+
+gr_flunet_dat <- gr_flunet_dat %>% left_join(max_gr %>% select(season, day_of_year) %>% rename(peak_time = day_of_year))
 gr_flunet_dat$day_shifted <- gr_flunet_dat$day_of_year - gr_flunet_dat$peak_time
+
+## Get max growth rate and week of max growth rate
+## Merge in raw data
+gr_flunet_dat <-gr_flunet_dat %>% left_join(flunet %>% mutate(gr = log((H3_sum+0.1)/lag(H3_sum+0.1,1)), gr_smooth = zoo::rollmean(gr, 4, fill=NA,align="right"))) 
 
 p_gr_flunet_by_peak <- ggplot(data=gr_flunet_dat %>% filter(day_shifted <= 100, day_shifted >= -100)) + 
   geom_hline(yintercept=0,linetype="dashed") +
   geom_ribbon(aes(x=day_shifted,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
   # geom_ribbon(aes(x=day_of_year,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
   geom_line(aes(x=day_shifted,y=y,group=season,col=plot_label)) +
-  scale_y_continuous(limits=c(-1.2,1.2),breaks=seq(-1.2,1.2,by=0.2)) +
+  scale_y_continuous(limits=c(-1,1),breaks=seq(-1.2,1.2,by=0.2)) +
   #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
   xlab("Day relative to peak") + ylab('Growth rate (per week)') +
   #scale_color_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
@@ -631,6 +651,22 @@ p_gr_flunet_by_peak <- ggplot(data=gr_flunet_dat %>% filter(day_shifted <= 100, 
   scale_fill_viridis_d("Time period") +
   theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
+
+p_gr_flunet_by_day_faceted <- ggplot(data=gr_flunet_dat) + 
+  geom_hline(yintercept=0,linetype="dashed") +
+  geom_line(aes(x=day_of_year,y=gr,col="Raw data")) +
+  geom_line(aes(x=day_of_year,y=gr_smooth,group=season,col="Smoothed data")) +
+  geom_ribbon(aes(x=day_of_year,ymin=lb_50,ymax=ub_50,group=season,col="Estimate"),alpha=0.1) +
+  geom_line(aes(x=day_of_year,y=y,group=season,col="Estimate")) +
+  xlab("Day of year (start of Epi week)") + ylab('Growth rate (per week)') +
+  scale_color_viridis_d("Time period") +
+  scale_fill_viridis_d("Time period") +
+  #scale_y_continuous(limits=c(-1.2,1.2),breaks=seq(-1.2,1.2,by=0.2)) +
+  coord_cartesian(ylim=c(-1,1)) +
+  theme_use + 
+  facet_wrap(~season) +
+  theme(legend.position="bottom",legend.direction="horizontal")
+
 
 p_gr_flunet <- add_doubling_axis(p_gr_flunet)
 p_gr_flunet_by_day <- add_doubling_axis(p_gr_flunet_by_day)
@@ -643,6 +679,11 @@ gr_flunet_dat %>% left_join(flunet) %>% filter(day_shifted <= 0) %>% group_by(se
 ggsave("figures/growth_rates/flunet_h3_growth_rate.png",p_gr_flunet,width=7,height=4)
 ggsave("figures/growth_rates/flunet_h3_growth_rate_by_day.png",p_gr_flunet_by_day,width=7,height=4)
 ggsave("figures/growth_rates/flunet_h3_growth_rate_by_peak.png",p_gr_flunet_by_peak,width=7,height=4)
+ggsave("figures/growth_rates/flunet_h3_growth_rate_by_day_faceted_ps.png",p_gr_flunet_by_day_faceted,width=7,height=7)
+
+ggsave("figures/growth_rates/flunet_h3_growth_rate_comb.png",p_gr_flunet_by_day/p_gr_flunet_by_peak
+,width=8,height=10)
+
 write_csv(gr_flunet_dat,"results/flunet_h3_growth_rates.csv")
 
 
@@ -747,9 +788,23 @@ p_gr_flunet_by_day<- ggplot(data=gr_flunet_dat) +
 
 
 ## Align by peak data
-max_gr <- gr_flunet_dat %>% group_by(season) %>% filter(y == max(y)) %>% select(season, day_of_year) %>% rename(peak_time = day_of_year)
-gr_flunet_dat <- gr_flunet_dat %>% left_join(max_gr)
+## Filter gr_flunet_dat to be between September and May each season
+gr_flunet_dat1 <- gr_flunet_dat %>%
+  filter(month(date) >= 9 | month(date) <= 4 | (month(date) == 5 & day(date) <= 1)) %>%
+  group_by(season) %>%
+  slice_max(y, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+max_gr <- gr_flunet_dat1 %>% group_by(season) %>% filter(y == max(y))# %>% select(season, day_of_year) %>% rename(peak_time = day_of_year)
+
+
+gr_flunet_dat <- gr_flunet_dat %>% left_join(max_gr %>% select(season, day_of_year) %>% rename(peak_time = day_of_year))
 gr_flunet_dat$day_shifted <- gr_flunet_dat$day_of_year - gr_flunet_dat$peak_time
+
+max_gr %>% select(season, Year, Week, date, y, lb_95, ub_95) %>% arrange(season) %>% tail(5) %>% print()
+
+## Merge in raw data
+gr_flunet_dat <-gr_flunet_dat %>% left_join(flunet %>% mutate(gr = log((H3_sum+0.1)/lag(H3_sum+0.1,1)), gr_smooth = zoo::rollmean(gr, 4, fill=NA,align="right"))) 
 
 p_gr_flunet_by_peak <- ggplot(data=gr_flunet_dat %>% filter(day_shifted <= 100, day_shifted >= -100)) + 
   geom_hline(yintercept=0,linetype="dashed") +
@@ -766,6 +821,21 @@ p_gr_flunet_by_peak <- ggplot(data=gr_flunet_dat %>% filter(day_shifted <= 100, 
   theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
 
+p_gr_flunet_by_day_faceted <- ggplot(data=gr_flunet_dat) + 
+  geom_hline(yintercept=0,linetype="dashed") +
+  geom_line(aes(x=day_of_year,y=gr,col="Raw data")) +
+  geom_line(aes(x=day_of_year,y=gr_smooth,group=season,col="Smoothed data")) +
+  geom_ribbon(aes(x=day_of_year,ymin=lb_50,ymax=ub_50,group=season,col="Estimate"),alpha=0.1) +
+  geom_line(aes(x=day_of_year,y=y,group=season,col="Estimate")) +
+  xlab("Day of year (start of Epi week)") + ylab('Growth rate (per week)') +
+  scale_color_viridis_d("Time period") +
+  scale_fill_viridis_d("Time period") +
+  #scale_y_continuous(limits=c(-1.2,1.2),breaks=seq(-1.2,1.2,by=0.2)) +
+  coord_cartesian(ylim=c(-1,1)) +
+  theme_use + 
+  facet_wrap(~season) +
+  theme(legend.position="bottom",legend.direction="horizontal")
+
 p_gr_flunet_all <- add_doubling_axis(p_gr_flunet_all)
 p_gr_flunet_by_day <- add_doubling_axis(p_gr_flunet_by_day)
 p_gr_flunet_by_peak <- add_doubling_axis(p_gr_flunet_by_peak)
@@ -773,6 +843,12 @@ p_gr_flunet_by_peak <- add_doubling_axis(p_gr_flunet_by_peak)
 ggsave("figures/growth_rates/flunet_all_growth_rate.png",p_gr_flunet,width=7,height=4)
 ggsave("figures/growth_rates/flunet_all_growth_rate_by_day.png",p_gr_flunet_by_day,width=7,height=4)
 ggsave("figures/growth_rates/flunet_all_growth_rate_by_peak.png",p_gr_flunet_by_peak,width=7,height=4)
+
+ggsave("figures/growth_rates/flunet_all_growth_rate_by_day_faceted_ps.png",p_gr_flunet_by_day_faceted,width=7,height=7)
+
+ggsave("figures/growth_rates/flunet_all_growth_rate_comb.png",p_gr_flunet_by_day/p_gr_flunet_by_peak
+       ,width=8,height=10)
+
 write_csv(gr_flunet_dat,"results/flunet_all_growth_rates.csv")
 
 

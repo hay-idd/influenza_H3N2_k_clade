@@ -1,13 +1,13 @@
-,Scenario,peak_date,ratio_peak_reported,ratio_cumulative_symptomatic,ratio_peak_symptomatic_est
-1,A. Base case (loosely based on 2022/23),10/12/2022,1.00,1.00,1.00
-2,B. Moderate immune escape (5% overall),03/12/2022,0.91,1.21,0.91
-3,C. High immune escape (10% overall),12/11/2022,0.94,1.35,0.94
-4,D. Highest immune escape (20% overall),15/10/2022,2.32,1.75,2.31
-5,E. Reduce immune fraction in <18 by 50%,08/10/2022,1.62,1.01,1.62
-6,"F. Reduce immune fraction to 20% in
- <5 and 50% in 5-18",12/11/2022,0.54,0.94,0.54
-7,G. Higher transmissibility (R0=2.2),03/12/2022,0.70,1.06,0.70
-8,H. Highest transmissibility (R0=2.4),05/11/2022,0.66,1.04,0.66
-9,I. Two weeks earlier seeding,07/12/2022,0.48,0.87,0.48
-10,I. Two weeks earlier seeding and 5% immune escape,12/10/2022,0.69,0.99,0.69
-11,J. One month earlier seeding,12/10/2022,0.47,0.73,0.47
+"","Scenario","peak_date","ratio_peak_reported","ratio_cumulative_symptomatic","ratio_peak_symptomatic_est"
+"1","A. Base case (loosely based on 2022/23)",2022-12-10,1,1,1
+"2","B. Moderate immune escape (5% overall)",2022-12-03,0.909274646305861,1.21014929553047,0.909233816455497
+"3","C. High immune escape (10% overall)",2022-11-12,0.937345609701325,1.34846703696048,0.937370704561889
+"4","D. Highest immune escape (20% overall)",2022-10-15,2.31506849315068,1.75486027298611,2.31499669883988
+"5","E. Reduce immune fraction in <18 by 50%",2022-10-08,1.62272625196497,1.00583946229604,1.62267582607602
+"6","F. Reduce immune fraction to 20% in
+ <5 and 50% in 5-18",2022-11-12,0.538513361778576,0.943771462482747,0.538527682585594
+"7","G. Higher transmissibility (R0=2.2)",2022-12-03,0.703346058836739,1.05891705729774,0.703324739837143
+"8","H. Highest transmissibility (R0=2.4)",2022-11-05,0.658881652818325,1.04203279300665,0.658884836671173
+"9","I. Two weeks earlier seeding",2022-12-07,0.481922299573321,0.87128878249795,0.481975665733958
+"10","I. Two weeks earlier seeding and 5% immune escape",2022-10-12,0.688300022456771,0.986652752865554,0.68824472600371
+"11","J. One month earlier seeding",2022-10-12,0.470693914215136,0.729608057557794,0.47059609519917
