@@ -517,9 +517,11 @@ server <- function(input, output, session) {
       res <- run_model()
       if (isTRUE(res$error)) stop("Model error: ", res$message)
       
+      last_scenario <- scenario_snapshot()
+      
       # build combined plot (dynamics + growth)
       # assumes you have build_combined_plot defined (uses build_incidence_plot and build_growth_plot)
-      p_combined <- build_combined_plot(res, input, flu_dat())
+      p_combined <- build_combined_plot(res, input, flu_dat(), last_scenario)
       
       # prepare data tables to include
       # cumulative incidence table (from model)
@@ -569,7 +571,8 @@ server <- function(input, output, session) {
       # if you want p1/p2 separately, rebuild them quickly:
       p1 <- build_incidence_plot(res, 
                                  input,
-                                 flu_dat())
+                                 flu_dat(),
+                                 last_scenario)
       p2 <- build_growth_plot(res, input, age_palette = "Set1")
       save(p_combined, p1, p2, res, cum_df, inc_long, growth_df, file = rdata_name)
       
