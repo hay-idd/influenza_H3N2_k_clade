@@ -222,9 +222,7 @@ ui <- fluidPage(
              fluidRow(
                column(9,
                       h3("About this model"),
-                      p("
-                        
-                        "),
+                      p("To facilicate scenario analysis in the context of seasonal flu epidemics driven by H3N2 we have used an age-stratified Susceptible-Infected-Recovered (SIR) model. The model allows us to explore how changes in transmissability or immune escape impact dynamics of the seasonal epidemic."),
                       br(),
                       br(),
                       h3("Default reference data (dashed lines on the plot labelled 2022/23)."),
