@@ -353,7 +353,7 @@ server <- function(input, output, session) {
     # run model
     y_base <- epi_ode_size(C_list, beta_par, gamma, N, ts = ts,
                            alphas = alphas,
-                           initial_immune_frac = defaults$initial_immune_frac,
+                           # initial_immune_frac = defaults$initial_immune_frac,
                            age_seed = 3, immunity_seed = 1,
                            seed_size = seed_size, return_compartments = TRUE)
     
