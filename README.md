@@ -13,4 +13,6 @@ The easiest way to run the model is to visit the Shiny app hosted at:
 
 You can also run the app locally by running the app.R file in the `ModelFluUk-H3N2` directory.
 
+The app allows users to modify various parameters and explore the resulting impact on flu timing, epidemic size and peak incidence across age groups.
+
 
