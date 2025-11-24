@@ -222,7 +222,7 @@ ui <- fluidPage(
              fluidRow(
                column(9,
                       h3("About this model"),
-                      p("To facilicate scenario analysis in the context of seasonal flu epidemics driven by H3N2 we have used an age-stratified Susceptible-Infected-Recovered (SIR) model. The model allows us to explore how changes in transmissability or immune escape impact dynamics of the seasonal epidemic."),
+                      p("To facilicate scenario analysis in the context of seasonal flu epidemics driven by H3N2 we have used an age-stratified Susceptible-Infected-Recovered (SIR) model. The model allows us to explore how changes in transmissability or immune escape impact dynamics of the seasonal epidemic. For full details please see the following preprint: INSERT LINK. Briefly, the model divides the population into four ages groups and two immunne catagories (see options on sidebar). Contact rates within and between age groups were derived from the POLYMOD study using the socialmixr R package (https://github.com/epiforecasts/socialmixr). Contact rates during half term holiday, pre-Christmas period, and the Christmas school holidays were accounted for by resampling from the original POLYMOD data. Model parameters were chosen based on standard seasonal influenza parameter values (R0 of 2, infectious period of 4-5 days, and final size of around 15%), intuition and manual calibration to generate seasonal dynamics similar to what was seen in the 2022/23 season."),
                       br(),
                       br(),
                       h3("Default reference data (dashed lines on the plot labelled 2022/23)."),
