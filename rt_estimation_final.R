@@ -204,7 +204,8 @@ daily_case_data$pandemic_phase=factor(daily_case_data$pandemic_phase,levels = le
 # Plot Rt estimates aligned by day in season of year
 
 #remove the rt estimates that don't have good estimates for the Rt 
-years_to_remove<-c("2011-2012","2012-2013", "2013-2014","2014-2015", "2019-2020","2020-2021")
+years_to_remove<-c("2011-2012","2012-2013", "2013-2014","2014-2015", "2019-2020","2020-2021",
+                   "2021-2022")
 Rt_df <- subset(Rt_df, !(season_label %in% years_to_remove))
 #do the same for the daily case data: 
 daily_case_data<-subset(daily_case_data, !(season_label %in% years_to_remove))
@@ -214,7 +215,7 @@ case_pl_1<-ggplot(daily_case_data, aes(x = day_in_season, y = rolling_mean, colo
   geom_line(size = 1) +
   #coord_cartesian(ylim=c(0,1500))+
   theme_bw()+
-  facet_wrap(~season_label, ncol = 3,scales="free_y") +  # vertical alignment
+  facet_wrap(~season_label, ncol = 2,scales="free_y") +  # vertical alignment
   scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   #scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   labs(title = "Daily incidence (interpolated) by influenza season",
@@ -231,7 +232,7 @@ p_Rt_1 <- ggplot(Rt_df, aes(x = day_in_season, y = Rt_mean, color = pandemic_pha
   geom_hline(yintercept = 1.2, linetype = "dotted", color = "darkred", size = .5) +
   geom_hline(yintercept = 1.4, linetype = "dotted", color = "darkred", size = .5) +
   geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper, fill = pandemic_phase), alpha = 0.4, color = NA) +
-  facet_wrap(~season_label, ncol = 3) +
+  facet_wrap(~season_label, ncol = 2) +
   theme_bw()+
   geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
   scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
@@ -246,7 +247,7 @@ p_Rt_1
 pl<-case_pl_1/p_Rt_1
 pl
 
-ggsave("rt_estimates_plots/rt_estimates_by_pandemic_phase_and_season.png",pl,height =12 ,width = 10)
+ggsave("rt_estimates_plots/rt_estimates_by_pandemic_phase_and_season_x1.png",pl,height =14 ,width = 10)
 
 
 
@@ -276,7 +277,7 @@ p_Rt_shifted_1 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean, co
                                                     round(peak_dates$peak_Rt, 2)," (",round(peak_dates$Rt_lower, 2),",",round(peak_dates$Rt_upper, 2),")", "") ), 
             inherit.aes = FALSE,    color = "darkred",     vjust = -0.5,   size = 3  ) +
   geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper, fill = pandemic_phase), alpha = 0.4, color = NA) +
-  facet_wrap(~ season_label, ncol = 3) +
+  facet_wrap(~ season_label, ncol = 2) +
   geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
   scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
@@ -289,7 +290,7 @@ p_Rt_shifted_1
 
 
 
-ggsave("rt_estimates_plots/pre-Christmas_rt_estimates_by_season_1_before_chrismas_day.png",p_Rt_shifted_1,height =8 ,width = 10)
+ggsave("rt_estimates_plots/pre-Christmas_rt_estimates_by_season_1_before_chrismas_day_x1.png",p_Rt_shifted_1,height =12 ,width = 10)
 
 
 # Peak Rt per season 
