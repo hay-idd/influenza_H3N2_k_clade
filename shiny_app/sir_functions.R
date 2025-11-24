@@ -17,6 +17,8 @@ general_sir <- function(t,y, pars, C, Nage,Nimmunity){
 }
 
 ## As above, but each age group has its own transmission parameter
+## The key is that C is a list, such that floor(t) finds the entry of that list corresponding to 
+## the current time. The C list should therefore be the same length as the number of days being simulated
 general_sir_timevarying_C <- function(t,y, pars, C, Nage,Nimmunity){
   beta <- pars[1] ## Overall transmission rate
   Tg <- pars[length(pars)] ## Recovery time
@@ -33,29 +35,6 @@ general_sir_timevarying_C <- function(t,y, pars, C, Nage,Nimmunity){
   
   return(list(c(tmp)))
 }
-
-
-## As above, but each age group has its own transmission parameter
-general_sir_timevarying_C_symp <- function(t,y, pars, C, Nage,Nimmunity){
-  beta <- pars[1] ## Overall transmission rate
-  kappa <- pars[2]
-  Tg <- pars[length(pars)] ## Recovery time
-  alphas <- pars[3:(length(pars)-1)] ## Vector of susceptibility parameters
-  
-  ## Generate matrix for compartment sizes
-  sir <- matrix(y,ncol=Nage*Nimmunity,nrow=5)
-  dS <- -(alphas*sir[1,]) * (beta*sir[2,] %*% t(C[[floor(t)]]))
-  dR <- sir[2,]/Tg
-  dI <- -dS - dR
-  dD <-  kappa*(alphas*sir[1,]) * (beta*sir[2,] %*% t(C[[floor(t)]]))
-  dInc <- (alphas*sir[1,]) * (beta*sir[2,] %*% t(C[[floor(t)]]))
-  
-  tmp <- as.vector(rbind(dS,dI,dR,dD,dInc))
-  
-  return(list(c(tmp)))
-}
-
-
 
 
 ## As above, but each age group has its own transmission parameter
@@ -94,7 +73,7 @@ general_sir_explicit <- function(t,y, pars, C, Nage,Nimmunity){
 #' @return an NxM matrix of attack rates (ie. proportion of susceptibles becoming infected)
 #' @seealso \code{\link{epi_final_size}}
 #' @export
-epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,initial_immune_frac=0,
+epi_ode_size <- function(C1, beta, Tg, Ns, alphas, initial_immune_frac=0,
                                 ts=seq(1,365,by=1),
                                 age_seeds=c(1),immunity_seed=1,seed_size=1,
                                 ver="fast",return_peak=FALSE,return_compartments=FALSE){
@@ -106,12 +85,11 @@ epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,initial_immune_f
   ## This generates a vector with S, I and R for each age class and immunity class
   ## ie. S_11, I_11, R_11, incidence_11, S_12, I_12, R_12, incidence_12, S_22, ... etc.
   ## where S_ak gives the number susceptible in age class 1, immunity class k
-  if(is.null(kappa)){
     long_Ns <- as.numeric(t(Ns))
     start <- NULL
-    start[1] <- long_Ns[1]
+    start[1] <- (1-initial_immune_frac)*long_Ns[1]
     start[2] <- 0
-    start[3] <- 0
+    start[3] <- initial_immune_frac*long_Ns[1] 
     start[4] <- 0
     index <- 5
     for(i in 2:length(long_Ns)){
@@ -132,47 +110,11 @@ epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,initial_immune_f
       start[(age_seed-1)*4*Nimmunity + (immunity_seed-1)*4+1] <- start[(age_seed-1)*4*Nimmunity + (immunity_seed-1)*4+1] - seed_size
       start[(age_seed-1)*4*Nimmunity + (immunity_seed-1)*4+2] <- start[(age_seed-1)*4*Nimmunity + (immunity_seed-1)*4+2] + seed_size
     }
-  } else {
-    long_Ns <- as.numeric(t(Ns))
-    start <- NULL
-    start[1] <- long_Ns[1]
-    start[2] <- 0
-    start[3] <- 0
-    start[4] <- 0
-    start[5] <- 0
-    index <- 6
-    for(i in 2:length(long_Ns)){
-      start[index] <- long_Ns[i]
-      index <- index + 1
-      start[index] <- 0
-      index <- index + 1
-      start[index] <- 0
-      index <- index + 1
-      start[index] <- 0
-      index <- index + 1
-      start[index] <- 0
-      index <- index + 1
-    }
-    start[start < 0] <- 0
-    
-    ## Move one susceptible to the infected classes for the seed population
-    for(age_seed in age_seeds){
-      start[(age_seed-1)*5*Nimmunity + (immunity_seed-1)*5+1] <- start[(age_seed-1)*5*Nimmunity + (immunity_seed-1)*5+1] - seed_size
-      start[(age_seed-1)*5*Nimmunity + (immunity_seed-1)*5+2] <- start[(age_seed-1)*5*Nimmunity + (immunity_seed-1)*5+2] + seed_size
-    }
-  }
-  #start[(age_seed + (immunity_seed-1) - 1)*3 + 1] <- start[(age_seed + (immunity_seed-1) - 1)*3 + 1] - 1
-  #  start[(age_seed + (immunity_seed-1) - 1)*3 + 2] <- start[(age_seed + (immunity_seed-1) - 1)*3 + 2] + 1
   
-  #beta_scales <- rep(beta_scales, each=Nimmunity)
   if(ver == "fast" & class(C) != "list"){
     y <- ode(y=start,t=ts,func=general_sir, parms=c(beta,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity)
   } else if(class(C) == 'list') {
-    if(is.null(kappa)){
-      y <- ode(y=start,t=ts,func=general_sir_timevarying_C, parms=c(beta,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity)
-    } else {
-      y <- ode(y=start,t=ts,func=general_sir_timevarying_C_symp, parms=c(beta,kappa,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity)
-    }
+     y <- ode(y=start,t=ts,func=general_sir_timevarying_C, parms=c(beta,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity)
   } else {
     y <- ode(y=start,t=ts,func=general_sir_explicit, parms=c(beta,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity)
   }
@@ -182,27 +124,15 @@ epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,initial_immune_f
   y <- as.data.frame(y)
   y <- y[,2:ncol(y)]
   ## Label which disease state each column is
-  if(!is.null(kappa)){
-    colnames(y) <- rep(c("S","I","R","D","inc"), Nage*Nimmunity)
-    if(return_compartments){
-      colnames(y) <- expand_grid(age=1:Nage,immunity=1:Nimmunity,compartment=c("S","I","R","D","inc")) %>% 
-        mutate(name = paste0(compartment,"_",age,"_",immunity)) %>% pull(name)
-      y$time <- ts
-      #y <- left_join(y, rt_ts)
-      return(y)
-    }
-  } else {
-    colnames(y) <- rep(c("S","I","R","inc"), Nage*Nimmunity)
-    if(return_compartments){
-      colnames(y) <- expand_grid(age=1:Nage,immunity=1:Nimmunity,compartment=c("S","I","R","inc")) %>% 
-        mutate(name = paste0(compartment,"_",age,"_",immunity)) %>% pull(name)
-      y$time <- ts
-      #y <- left_join(y, rt_ts)
-      return(y)
-    }
-  }
-  
 
+  colnames(y) <- rep(c("S","I","R","inc"), Nage*Nimmunity)
+  if(return_compartments){
+    colnames(y) <- expand_grid(age=1:Nage,immunity=1:Nimmunity,compartment=c("S","I","R","inc")) %>% 
+      mutate(name = paste0(compartment,"_",age,"_",immunity)) %>% pull(name)
+    y$time <- ts
+    #y <- left_join(y, rt_ts)
+    return(y)
+  }
   
   ## Pull out the recovered population to get final size
   recovered <- y[,which(colnames(y) == "R")]
@@ -221,6 +151,7 @@ epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,initial_immune_f
   }
 }
 
+## CAUTION -- BELOW CODE WAS GENERATED BY CHATGPT AND HAS NOT BEEN THOROUGHLY CHECKED
 # compute Rt at a single time/state
 compute_Rt_one <- function(t, y, pars, C, Nage, Nimmunity, Tg_index = length(pars)) {
   # pars: numeric vector as in your ODE: pars[1]=beta, pars[2:(end-1)]=alphas, last = Tg

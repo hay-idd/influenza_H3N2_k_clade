@@ -1,87 +1,112 @@
-# combine_files_and_plots.R
+# combine_sizes_from_subfolders.R
 library(tidyverse)
-library(patchwork)   # for composing ggplots
-library(ggplot2)
 
 # === user config ===
-csv_dir   <- "~/Documents/GitHub/influenza_H3N2_k_clade/scenarios/"       # folder containing many .csv files
-plots_dir <- "~/Documents/GitHub/influenza_H3N2_k_clade/scenarios/"     # folder containing subfolders, each has one .RData with object `plot_obj`
-out_csv   <- "combined_all_csvs.csv"
-out_png   <- "combined_plots.png"
-ncol_out  <- 2                          # number of columns in final multi-panel
+csv_dir   <- "~/Documents/GitHub/influenza_H3N2_k_clade/scenarios/"   # top-level folder containing many subfolders
+out_table <- "~/Documents/GitHub/influenza_H3N2_k_clade/figures/scenario_table_65_and_total.csv"
 
-# === combine CSVs ===
-csv_files <- list.files(csv_dir, pattern = "\\.csv$", full.names = TRUE)
-combined_tbl <- csv_files %>%
-  set_names() %>%
-  map_dfr(~ read_csv(.x, show_col_types = FALSE), .id = "source_file") %>%
-  mutate(Scenario = tools::file_path_sans_ext(basename(source_file))) %>%
-  select(-source_file) %>%
-  relocate(Scenario)
+# === read subfolders' cumulative_incidence.csv ===
+subdirs <- list.dirs(csv_dir, recursive = FALSE, full.names = TRUE)
+all_tbls <- map_dfr(subdirs, function(d) {
+  f <- file.path(d, "cumulative_incidence.csv")
+  if (!file.exists(f)) return(tibble())          # skip missing files
+  read_csv(f, show_col_types = FALSE) %>%
+    mutate(Scenario = basename(d)) %>%
+    relocate(Scenario)
+})
 
-# write combined csv
-write_csv(combined_tbl, out_csv)
-message("Wrote combined CSV to: ", out_csv)
+if (nrow(all_tbls) == 0) stop("No tables read from subfolders")
 
+# try to identify the cumulative column (first reasonable match)
+cum_col_candidates <- names(all_tbls)[str_detect(names(all_tbls),
+                                                 regex("Cumulative|total_inf|cumulative influenza|final_size|total", ignore_case = TRUE))]
+if (length(cum_col_candidates) == 0) stop("No cumulative-like column found")
+cum_col <- cum_col_candidates[1]
 
-# find the cumulative column (first column name that contains "Cumulative")
-cum_col <- names(combined_tbl)[str_detect(names(combined_tbl), regex("Cumulative", ignore_case = TRUE))][1]
-if (is.na(cum_col)) stop("No column with 'Cumulative' found in combined_tbl")
+# make sure it's numeric (coerce safely)
+all_tbls <- all_tbls %>% mutate(!!cum_col := as.numeric(!!sym(cum_col)))
 
-# extract 65+ rows and keep only Scenario + cumulative value
-df65 <- combined_tbl %>%
-  filter(`Age group` %in% c("65+", "65+ years", "65 yrs")) %>%   # tolerant matching
-  select(Scenario, cum_65 = !!sym(cum_col)) %>%
-  mutate(cum_65 = as.numeric(cum_65))
+# --- compute final_size_total per scenario ---
+# prefer explicit 'Total' row, otherwise sum numeric rows by scenario
+df_total_explicit <- all_tbls %>%
+  filter(str_to_lower(`Age group`) %in% c("total")) %>%
+  select(Scenario, final_size_total = !!sym(cum_col)) %>%
+  distinct()
 
-# try to find the base case row (several fallbacks)
-base_row <- df65 %>%
-  filter(str_detect(tolower(Scenario), "\\bbase_counts\\b|\\bbase\\b")) %>%
-  slice_head(n = 1)
-
-if (nrow(base_row) == 0) {
-  # fallback: look for scenario starting with "base" or use the first row
-  base_row <- df65 %>%
-    filter(str_detect(tolower(Scenario), "^base")) %>%
-    slice_head(n = 1)
-}
-if (nrow(base_row) == 0) {
-  base_row <- df65 %>% slice_head(n = 1)
-  warning("Could not find explicit 'base' scenario; using first Scenario as base: ", base_row$Scenario)
+if (nrow(df_total_explicit) > 0) {
+  df_total <- df_total_explicit
+} else {
+  df_total <- all_tbls %>%
+    filter(!is.na(!!sym(cum_col))) %>%
+    group_by(Scenario) %>%
+    summarise(final_size_total = sum(!!sym(cum_col), na.rm = TRUE), .groups = "drop")
 }
 
-base_value <- base_row$cum_65[1]
+# --- compute final_size_65 per scenario (tolerant matching) ---
+df_65 <- all_tbls %>%
+  filter(str_detect(`Age group`, regex("^(65\\+|65|65\\s*years|65\\s*yrs)$", ignore_case = TRUE))) %>%
+  group_by(Scenario) %>%
+  summarise(final_size_65 = sum(!!sym(cum_col), na.rm = TRUE), .groups = "drop")
 
-# produce result table with ratio
-result_df <- df65 %>%
-  mutate(ratio_to_base = cum_65 / base_value) %>%
-  arrange(desc(cum_65))
+# join
+sizes_df <- df_total %>%
+  left_join(df_65, by = "Scenario")
 
-# optional: nicely formatted numeric columns if desired
-result_df_formatted <- result_df %>%
+# --- find base values (use raw scenario names) ---
+find_base_value <- function(df, value_col) {
+  # search for common base names
+  idx <- which(str_detect(tolower(df$Scenario), "\\bbase_counts\\b|\\bbase\\b"))
+  if (length(idx) == 0) idx <- which(str_detect(tolower(df$Scenario), "^base"))
+  if (length(idx) == 0) idx <- 1                # fallback to first
+  val <- df[[value_col]][idx[1]]
+  if (is.na(val) || val == 0) warning("Base value is NA or zero; check scenarios")
+  val
+}
+base_total_value <- find_base_value(sizes_df, "final_size_total")
+base_65_value    <- if ("final_size_65" %in% names(sizes_df)) find_base_value(sizes_df, "final_size_65") else NA_real_
+
+# --- compute ratios safely ---
+result_df <- sizes_df %>%
   mutate(
-    cum_65 = signif(cum_65, 6),
-    ratio_to_base = round(ratio_to_base, 3)
-  )
+    final_size_total = as.numeric(final_size_total),
+    final_size_65    = as.numeric(final_size_65),
+    final_size_total_rel = ifelse(!is.na(base_total_value) & base_total_value > 0,
+                                  final_size_total / base_total_value, NA_real_),
+    final_size_65_rel = ifelse(!is.na(base_65_value) & base_65_value > 0,
+                               final_size_65 / base_65_value, NA_real_)
+  ) %>%
+  arrange(desc(final_size_total))
 
-# outputs
-result_df      # raw numeric table (mergeable)
-result_df_formatted  # human-friendly formatted table
-
+# optional: pretty labels mapping (do AFTER computing ratios)
 scenario_labels <- c(
-  "base_counts"                               = "A. Base case (loosely based on the 2022/23 season)",
-  "month_early"                         = "B. Earlier seeding",
-  "moderate_immune_escape"              = "C. Moderate immune escape",
-  "severe_immune_escape"                = "D. Severe immune escape",
-  "r0_10_percent"                       = "E. Moderately higher transmissibility",
-  "r0_20_percent"                       = "F. Severely higher transmissibility",
-  "moderate_immune_escape_and_earlier"  = "G. Moderate immune escape and earlier seeding",
-  "immune_escape_by_age"                = "H. Increased immune escape in younger ages",
-  "more_xmas_mixing"                    = "I. Increased mixing in the Christmas period",
-  "moderate_immune_escape_earlier_r0_10pct" =
-    "J. Moderate immune escape + earlier seeding\n + higher transmissibility"
+  "base" = "A. Base case (loosely based on 2022/23)",
+  "base_counts" = "A. Base case (loosely based on 2022/23)",
+  "moderate_immune_escape" = "B. Moderate immune escape (5% overall)",
+  "high_immune_escape" = "C. High immune escape (10% overall)",
+  "highest_immune_escape" = "D. Highest immune escape (20% overall)",
+  "fifty_percent_immune_kids" = "E. Reduce immune fraction in <18 by 50%",
+  "youngest_20_older_50_immune_escape" = "F. Reduce immune fraction to 20% in\n <5 and 50% in 5-18",
+  "higher_r0" = "G. Higher transmissibility (R0=2.2)",
+  "highest_r0" = "H. Highest transmissibility (R0=2.4)",
+  "two_weeks_early" = "I. Two weeks earlier seeding",
+  "month_early" = "J. One month earlier seeding",
+  "two_weeks_moderate_escape" = "K. Two weeks earlier seeding and 5% immune escape"
 )
 
-result_df_formatted$Scenario <- scenario_labels[result_df_formatted$Scenario]
-result_df_formatted <- result_df_formatted %>% arrange(Scenario)
-write.csv(result_df_formatted, "~/Documents/GitHub/influenza_H3N2_k_clade/figures/scenario_table_65.csv")
+result_df <- result_df %>%
+  mutate(Scenario_pretty = if_else(Scenario %in% names(scenario_labels),
+                                   scenario_labels[Scenario], Scenario)) %>%
+  select(Scenario = Scenario_pretty, everything(), -Scenario)
+
+# write out
+
+result_df <- result_df %>% arrange(Scenario)
+result_df$final_size_total_rel <- result_df$final_size_total/result_df$final_size_total[result_df$Scenario == "A. Base case (loosely based on 2022/23)"]
+result_df$final_size_65_rel <- result_df$final_size_65/result_df$final_size_65[result_df$Scenario == "A. Base case (loosely based on 2022/23)"]
+
+write.csv(result_df, out_table)
+message("Wrote final-size table to: ", out_table)
+
+# return in interactive sessions
+invisible(result_df)
+

@@ -1,12 +1,13 @@
-"","Scenario","peak_date","ratio_peak_reported","ratio_cumulative_symptomatic","ratio_peak_symptomatic_est"
-"1","A. Base case (loosely based on the 2022/23 season)",2022-12-08,1,1,1
-"2","B. Earlier seeding",2022-10-17,0.389421157684631,0.794830519934599,0.389390620838196
-"3","C. Moderate immune escape",2022-12-01,0.910578842315369,1.06486055996739,0.910568994690137
-"4","D. Severe immune escape",2022-11-03,0.856087824351297,1.08498726512433,0.856052113693546
-"5","E. Moderately higher transmissibility",2022-11-24,0.732934131736527,1.03640310394203,0.733024629258095
-"6","F. Severely higher transmissibility",2022-11-03,0.742914171656687,1.00766211913649,0.743017270948666
-"7","G. Moderate immune escape and earlier seeding",2022-11-07,0.490419161676647,0.920592360988153,0.490428928120431
-"8","H. Increased immune escape in younger ages",2022-11-17,0.755089820359281,1.0291920609049,0.755201596599848
-"9","I. Increased mixing in the Christmas period",2022-12-08,1.37704590818363,1.10492812181068,1.37699670792302
-"10","J. Moderate immune escape + earlier seeding
- + higher transmissibility",2022-10-10,1.05588822355289,0.954496718058414,1.05583452618428
+,Scenario,peak_date,ratio_peak_reported,ratio_cumulative_symptomatic,ratio_peak_symptomatic_est
+1,A. Base case (loosely based on 2022/23),10/12/2022,1.00,1.00,1.00
+2,B. Moderate immune escape (5% overall),03/12/2022,0.91,1.21,0.91
+3,C. High immune escape (10% overall),12/11/2022,0.94,1.35,0.94
+4,D. Highest immune escape (20% overall),15/10/2022,2.32,1.75,2.31
+5,E. Reduce immune fraction in <18 by 50%,08/10/2022,1.62,1.01,1.62
+6,"F. Reduce immune fraction to 20% in
+ <5 and 50% in 5-18",12/11/2022,0.54,0.94,0.54
+7,G. Higher transmissibility (R0=2.2),03/12/2022,0.70,1.06,0.70
+8,H. Highest transmissibility (R0=2.4),05/11/2022,0.66,1.04,0.66
+9,I. Two weeks earlier seeding,07/12/2022,0.48,0.87,0.48
+10,I. Two weeks earlier seeding and 5% immune escape,12/10/2022,0.69,0.99,0.69
+11,J. One month earlier seeding,12/10/2022,0.47,0.73,0.47

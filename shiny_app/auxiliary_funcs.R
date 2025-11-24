@@ -59,7 +59,8 @@ get_beta_vector <- function(C, propns, inf_period=5, r0, beta_scales){
   beta <- r0/(R0*inf_period)
   beta
 }
-
+## NOT USED -- this was from a version where I was scaling transmission rates by age 
+## following a sigmoid function
 get_sigmoid_func_outputs <- function(ages, pars){
   final <- matrix(nrow=nrow(pars),ncol=length(ages))
   for(j in 1:nrow(pars)){
@@ -75,7 +76,7 @@ get_sigmoid_func_outputs <- function(ages, pars){
   return(final)
 }
 
-## Thins the polymod contact matrix for the desired age range
+## NOT USED - Thins the polymod contact matrix for the desired age range
 thin_polymod <- function(polymod, age_lower=0, age_upper=20, thin_propn=0.2,
                          same_age=TRUE){
   
@@ -109,6 +110,7 @@ thin_polymod <- function(polymod, age_lower=0, age_upper=20, thin_propn=0.2,
 }
 
 # function to compute weight vector given one holiday interval
+## Smooths between 1 and 0 starting from start-smooth time (ending at smooth_time) and smoothing the other way from end to (end + smooth_time)
 weight_for_hol <- function(dates, start, end, smooth_time) {
   st <- as.Date(start); en <- as.Date(end)
   st_buf <- st - smooth_time
@@ -117,6 +119,7 @@ weight_for_hol <- function(dates, start, end, smooth_time) {
   t_before <- pmin(pmax(as.numeric(dates - st_buf) / smooth_time, 0), 1)  # 0 at st_buf -> 1 at st
   t_after  <- pmin(pmax(as.numeric(dates - en) / smooth_time, 0), 1)      # 0 at en -> 1 at en+smooth_time
   # easing: eased(t) goes 0 -> 1 smoothly
+  ## Using cosine function for the smoothing, interesting
   eased_before <- (1 - cos(pi * t_before)) / 2
   eased_after  <- (1 - cos(pi * t_after)) / 2
   # weight pieces:
@@ -134,12 +137,14 @@ weight_for_hol <- function(dates, start, end, smooth_time) {
 }
 
 
+## Creates a tibble marking the holiday dates and using the smoothing function to transition
+## the contact matrix weightings
 setup_holiday_tibble <- function(start_date,end_date, half_term_start,half_term_end,winter_holiday_start,winter_holiday_end,  smooth_time = 7){
   
   
   all_days <- tibble(date = seq(start_date, end_date, by = "day"))
   
-  # label
+  # label half term, term time and winter holiday
   school_days <- all_days %>%
     mutate(
       label = dplyr::case_when(
@@ -171,11 +176,14 @@ setup_holiday_tibble <- function(start_date,end_date, half_term_start,half_term_
   school_days_weighted
 }
 
+## Similar to the above function but for a generic list of dates
 setup_period_tibble <- function(start_date, end_date, ..., smooth_time = 7, period_names = NULL) {
   dates <- seq(as.Date(start_date), as.Date(end_date), by = "day")
   pts   <- unlist(list(...))
   if (!inherits(pts, "Date")) pts <- as.Date(pts, origin = "1970-01-01")  # handles numeric safely
+  ## If no holiday flags set, just set everything to term time
   if (length(pts) == 0) return(tibble::tibble(date = dates, label = "term_time", weight = 1))
+  ## Otherwise, 
   starts <- pts[seq(1, length(pts), 2)]
   ends   <- pts[seq(2, length(pts), 2)]
   n      <- length(starts)
@@ -205,4 +213,146 @@ aggregate_to_groups <- function(ret, age0 = NULL){
     `65+`   = ret[ , "[65,75)"] + ret[ , "75+"]
   )
   as.data.frame(out)
+}
+
+
+## CHECKED -- ALL FINE
+# ---- helper: build contact matrices (uses same logic as app) ----
+build_contact_matrices <- function(contact_params) {
+  polymod_c_term <- contact_matrix(polymod_base,
+                                   countries = "United Kingdom",
+                                   age.limits = age_breaks,
+                                   symmetric = TRUE,
+                                   missing.contact.age = "sample",
+                                   missing.participant.age = "remove")
+  C_term <- polymod_c_term$matrix
+  row.names(C_term) <- colnames(C_term)
+  
+  # contact multipliers (provide defaults if not present)
+  prop_home_contacts_in_hols <- contact_params$prop_home_contacts_in_hols %||% 1
+  prop_work_contacts_in_hols <- contact_params$prop_work_contacts_in_hols %||% 0.75
+  prop_rest_contacts_in_hols <- contact_params$prop_rest_contacts_in_hols %||% 1.1
+  prop_all_contacts_christmas <- contact_params$prop_all_contacts_christmas %||% 1.3
+  prop_rest_contacts_in_christmas <- contact_params$prop_rest_contacts_in_christmas %||% 0.67
+  prop_home_contacts_in_christmas <- contact_params$prop_home_contacts_in_christmas %||% 3
+  
+  ## Set contact matrix for school holidays
+  contacts <- contacts_all
+  ## Pull out non home, non work and non school contacts -- these will be inflated
+  contacts_others <- contacts %>% filter(cnt_school == 0, cnt_work == 0, cnt_home == 0) %>%
+    sample_frac(prop_rest_contacts_in_hols, replace = TRUE)
+  
+  ## Pull out work contacts and sample a fraction (this should be <1, otherwise need to sample with replacement)
+  contacts_work <- contacts %>% filter(cnt_work == 1) %>% sample_frac(prop_work_contacts_in_hols)
+  
+  ## Pull out home contacts and resample with replacement
+  contacts_home <- contacts %>% filter(cnt_home == 1) %>% sample_frac(prop_home_contacts_in_hols, replace = TRUE)
+  
+  ## Combine all types of contacts for the overall survey results for the overall contact matrix
+  contacts_overall <- bind_rows(contacts_others, contacts_work, contacts_home)
+  polymodTermBreak <- polymod_base
+  polymodTermBreak$contacts <- contacts_overall
+  
+  ## Use socialmixr package
+  polymod_c_holidays <- contact_matrix(polymodTermBreak,
+                                       countries = "United Kingdom",
+                                       age.limits = age_breaks,
+                                       symmetric = TRUE,
+                                       missing.contact.age = "sample",
+                                       missing.participant.age = "remove")
+  C_holidays <- polymod_c_holidays$matrix
+  row.names(C_holidays) <- colnames(C_holidays)
+  
+  # christmas pre-holidays -- period from 1st Dec to 15th (ish)
+  ## Pull out school contacts -- we won't change these, so pulling out to add back in unchanged
+  contacts_schools <- contacts_all %>% filter(cnt_school == 1)
+  ## Pull out all non-school contacts and resample with replacement to inflate
+  contacts_non_school <- contacts_all %>% filter(cnt_school == 0) %>% sample_frac(prop_all_contacts_christmas, replace = TRUE)
+  
+  ## Combine altered contact rates
+  polymodChristmasPeriod <- polymod_base
+  polymodChristmasPeriod$contacts <- bind_rows(contacts_non_school, contacts_schools)
+  
+  ## Create POLYMOD contact matrix
+  polymod_c_christmas_break <- contact_matrix(polymodChristmasPeriod,
+                                              countries = "United Kingdom",
+                                              age.limits = age_breaks,
+                                              symmetric = TRUE,
+                                              missing.contact.age = "sample",
+                                              missing.participant.age = "remove")
+  C_christmas_break <- polymod_c_christmas_break$matrix
+  row.names(C_christmas_break) <- colnames(C_christmas_break)
+  
+  # christmas school holidays (end of school term)
+  ## Downsample non-school contacts -- we exclude school contacts
+  contacts_non_school2 <- contacts_all %>% filter(cnt_school == 0) %>% sample_frac(prop_rest_contacts_in_christmas, replace = TRUE)
+  
+  ## Upsample school contacts from the downsampled overall contact data
+  contacts_home_ch <- contacts_non_school2 %>% filter(cnt_home == 1) %>% sample_frac(prop_home_contacts_in_christmas, replace = TRUE)
+  
+  ## Make the contact matrix
+  polymodChristmasHoliday <- polymod_base
+  polymodChristmasHoliday$contacts <- bind_rows(contacts_non_school2, contacts_home_ch)
+  polymod_c_xmas_holidays <- contact_matrix(polymodChristmasHoliday,
+                                            countries = "United Kingdom",
+                                            age.limits = age_breaks,
+                                            symmetric = TRUE,
+                                            missing.contact.age = "sample",
+                                            missing.participant.age = "remove")
+  C_xmas_holidays <- polymod_c_xmas_holidays$matrix
+  row.names(C_xmas_holidays) <- colnames(C_xmas_holidays)
+  
+  list(term = C_term,
+       term_break = C_holidays,
+       christmas_period = C_christmas_break,
+       christmas_holiday = C_xmas_holidays,
+       polymod_term = polymod_c_term)
+}
+
+# ---- helper: make_weights_df (copied from app, relies on auxiliary_funcs) ----
+make_weights_df <- function(start_date, end_date, smooth_time = 7) {
+  ## Create weighting of term time days
+  school_days_weighted <- setup_holiday_tibble(start_date, end_date,
+                                               half_term_start, half_term_end,
+                                               shopping_period_start, winter_holiday_end,
+                                               smooth_time = smooth_time)
+  ## Creating weighting of half term matrix
+  half_term_weighting <- setup_period_tibble(start_date, end_date,
+                                             half_term_start, half_term_end,
+                                             smooth_time = smooth_time)
+  
+  ## Create weighting of Christmas holiday matrix
+  christmas_holiday_weighting <- setup_period_tibble(start_date, end_date,
+                                                     winter_holiday_start, winter_holiday_end,
+                                                     smooth_time = smooth_time)
+  
+  ## Create weighting of shopping period matrix
+  christmas_shopping_period <- setup_period_tibble(start_date, end_date,
+                                                   shopping_period_start, shopping_period_end,
+                                                   smooth_time = smooth_time)
+  
+  ## Reference dates to join on and create overall contact matrix weighting
+  ref_dates <- school_days_weighted$date
+  weights_df <- tibble::tibble(date = ref_dates) %>%
+    ## Merge in half-term weightings
+    dplyr::left_join(half_term_weighting %>% dplyr::select(date, weight) %>% dplyr::rename(w_termBreak = weight), by = "date") %>%
+    ## Merge in CHristmas shopping period weighting
+    dplyr::left_join(christmas_shopping_period %>% dplyr::select(date, weight) %>% dplyr::rename(w_ChristmasPeriod = weight), by = "date") %>%
+    ## Merge in Christmas school holiday weighting
+    dplyr::left_join(christmas_holiday_weighting %>% dplyr::select(date, weight) %>% dplyr::rename(w_ChristmasBreak = weight), by = "date") %>%
+    
+    ## Take 1- all these weighings, sum, and renormalise for each day. The remaining weighting is given to the term time matrix
+    dplyr::mutate(
+      h_termBreak       = 1 - w_termBreak,
+      h_ChristmasPeriod = 1 - w_ChristmasPeriod,
+      h_ChristmasBreak  = 1 - w_ChristmasBreak,
+      sum_h = h_termBreak + h_ChristmasPeriod + h_ChristmasBreak,
+      norm_factor = ifelse(sum_h > 1, 1 / sum_h, 1), ## Check weightings sum to 1
+      h_termBreak = h_termBreak * norm_factor,
+      h_ChristmasPeriod = h_ChristmasPeriod * norm_factor,
+      h_ChristmasBreak = h_ChristmasBreak * norm_factor,
+      w_term = 1 - (h_termBreak + h_ChristmasPeriod + h_ChristmasBreak)
+    ) %>%
+    dplyr::select(date, w_term, h_termBreak, h_ChristmasPeriod, h_ChristmasBreak)
+  list(schedule = school_days_weighted, weights = weights_df)
 }

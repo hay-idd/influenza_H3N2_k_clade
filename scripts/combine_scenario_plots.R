@@ -3,8 +3,9 @@ library(tidyverse)
 library(ggplot2)
 
 # ---- CONFIG ----
-plots_dir <- "~/Documents/GitHub/influenza_H3N2_k_clade/scenarios/" # each subfolder must contain one .RData with 'res' (and optionally 'plot_obj'/'plot_data')
+plots_dir <- "~/Documents/GitHub/influenza_H3N2_k_clade/scenarios//" # each subfolder must contain one .RData with 'res' (and optionally 'plot_obj'/'plot_data')
 out_png   <- "combined_facet_plot.png"
+save_wd <- "~/Documents/GitHub/influenza_H3N2_k_clade/figures/"
 ncol_out  <- 2
 age_group_key_plot <- c("inc_1_1" = "[0,5)", "inc_2_1" = "[5,18)", "inc_3_1" = "[18,65)", "inc_4_1" = "65+")
 
@@ -110,22 +111,23 @@ annots_df <- left_join(annots_df, ymax_df, by = "Scenario") %>%
 age_levels <- c("[0,5)","[5,18)","[18,65)","65+")
 combined_inc$age_group <- factor(combined_inc$age_group, levels = age_levels)
 
-scenario_labels <- c(
-  "base"                               = "A. Base case (loosely based on the 2022/23 season)",
-  "month_early"                         = "B. Earlier seeding",
-  "moderate_immune_escape"              = "C. Moderate immune escape",
-  "severe_immune_escape"                = "D. Severe immune escape",
-  "r0_10_percent"                       = "E. Moderately higher transmissibility",
-  "r0_20_percent"                       = "F. Severely higher transmissibility",
-  "moderate_immune_escape_and_earlier"  = "G. Moderate immune escape and earlier seeding",
-  "immune_escape_by_age"                = "H. Increased immune escape in younger ages",
-  "more_xmas_mixing"                    = "I. Increased mixing in the Christmas period",
-  "moderate_immune_escape_earlier_r0_10pct" =
-    "J. Moderate immune escape + earlier seeding\n + higher transmissibility"
-)
-keep_levels <- names(scenario_labels)
-keep_levels_labels <- scenario_labels
-combined_inc$Scenario <- factor(combined_inc$Scenario, levels=keep_levels)
+scenario_labels <- c("base" = "A. Base case (loosely based on 2022/23)", 
+                     
+                     "moderate_immune_escape" = "B. Moderate immune escape (5% overall)", 
+                     "high_immune_escape" = "C. High immune escape (10% overall)", 
+                     "highest_immune_escape" = "D. Highest immune escape (20% overall)", 
+                     "fifty_percent_immune_kids" = "E. Reduce immune fraction in <18 by 50%", 
+                     "youngest_20_older_50_immune_escape"= "F. Reduce immune fraction to 20% in\n <5 and 50% in 5-18",
+                     "higher_r0" = "G. Higher transmissibility (R0=2.2)", 
+                     "highest_r0" = "H. Highest transmissibility (R0=2.4)", 
+                     "two_weeks_early" = "I. Two weeks earlier seeding", 
+                     "month_early" = "J. One month earlier seeding", 
+                     "two_weeks_moderate_escape" = "I. Two weeks earlier seeding and 5% immune escape")
+
+
+#keep_levels <- names(scenario_labels)
+#keep_levels_labels <- scenario_labels
+#combined_inc$Scenario <- factor(combined_inc$Scenario, levels=keep_levels)
 
 # apply mapping
 combined_inc$Scenario <- factor(
@@ -142,12 +144,21 @@ combined_inc$Scenario <- factor(combined_inc$Scenario,levels = scenario_labels)
 rects_df$Scenario  <- factor(rects_df$Scenario,  levels = levels(combined_inc$Scenario))
 annots_df$Scenario <- factor(annots_df$Scenario, levels = levels(combined_inc$Scenario))
 
+pad_df <- tibble::tibble(
+  Scenario = levels(combined_inc$Scenario),                  # all scenario names used in the facet
+  # choose an x value inside the plotting x-range (use a mid-date or first date)
+  x = 50,
+  y = if_else(Scenario == "D. Highest immune escape (20% overall)", 7000, 4000)
+)%>% filter(Scenario != "I. Two weeks earlier seeding and 5% immune escape")
+
 # ---- build shared-facet plot ----
 p <- ggplot() +
-  geom_rect(data = rects_df, aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = fill),
+  geom_blank(data = pad_df, aes(x = as.Date("2022-10-10"), y = y)) +
+  
+  geom_rect(data = rects_df %>% filter(Scenario != "I. Two weeks earlier seeding and 5% immune escape"), aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = fill),
             inherit.aes = FALSE, alpha = 0.25) +
-  geom_line(data = combined_inc, aes(x = date, y = incidence, color = age_group, group = age_group), size = 0.9) +
-  facet_wrap(~ Scenario, ncol = ncol_out) +
+  geom_line(data = combined_inc%>% filter(Scenario != "I. Two weeks earlier seeding and 5% immune escape"), aes(x = date, y = incidence, color = age_group, group = age_group), size = 0.9) +
+  facet_wrap(~ Scenario, ncol = ncol_out,scales="free_y") +
   scale_color_brewer("Age group", palette = "Set1") +
   scale_fill_brewer("Holiday period", palette = "Set2") +
   #geom_label(data = annots_df, aes(x = x, y = y, label = label), inherit.aes = FALSE,
@@ -167,12 +178,13 @@ p <- ggplot() +
     legend.spacing.y = unit(4, "pt"),     # <-- spacing between legend boxes
     panel.spacing.x = unit(1, "cm")       # (your earlier spacing adjustment)
   ) +
-  coord_cartesian(ylim=c(0,5000), expand = FALSE,xlim=as.Date(c("2022-09-01","2023-02-01")))
-
+  scale_y_continuous(breaks=seq(0,10000,by=1000)) +
+  coord_cartesian(expand = TRUE,xlim=as.Date(c("2022-09-01","2023-02-01")))
+p
 # Save
-ggsave(out_png, p, width = 9, height = 11, dpi = 300)
+ggsave(paste0(save_wd,out_png), p, width = 9, height = 11, dpi = 300)
 message("Saved combined plot: ", out_png)
-break
+
 # --- Clean all quotes from Scenario & label ---
 annots_clean <- annots_df %>%
   mutate(
@@ -227,6 +239,6 @@ ratio_table <- parsed_annots %>%
 
 # --- Print output ---
 parsed_annots
-ratio_table
-
+ratio_table <- ratio_table %>% arrange(Scenario)
+  
 write.csv(ratio_table %>% arrange(Scenario),"~/Documents/GitHub/influenza_H3N2_k_clade/figures/scenario_table.csv")
