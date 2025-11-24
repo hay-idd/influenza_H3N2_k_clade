@@ -107,7 +107,7 @@ daily_case_data <- daily_data %>%
     day_in_season = as.numeric(date - as.Date(paste0(season_year, "-09-01"))),
     subtype = case_when(
       season_label == "2020-2021" ~ "NA (COVID-19 pandmeic)",  # COVID year
-      season_label %in% c("2015-2016",,"2018-2019", "2023-2024", "2024-2025") ~ "A/H1N1pdm09",
+      season_label %in% c("2015-2016","2018-2019", "2023-2024", "2024-2025") ~ "A/H1N1pdm09",
       TRUE ~ "A/H3N2"
     )
   )
@@ -118,6 +118,7 @@ p_incidence <- ggplot(daily_case_data, aes(x = day_in_season, y = rolling_mean))
   facet_wrap(~ season_label, scales = "free") +
   labs(title = "Daily Interpolated Cases", x = "Date", y = "Cases") +
   theme_minimal()
+
 p_incidence
 
 
@@ -151,8 +152,8 @@ Rt_df <- Rt_df %>%
     season_label = paste0(season_year, "-", season_year + 1),
     day_in_season = as.numeric(date - as.Date(paste0(season_year, "-09-01"))), # day 0 = September 1
     subtype = case_when(
-      season_label == "2020-2021" ~"NA (COVID-19 pandmeic)",
-      season_label %in% c("2015-2016",,"2018-2019", "2023-2024", "2024-2025") ~ "A/H1N1pdm09",
+      season_label == "2020-2021" ~ "NA (COVID-19 pandmeic)",  # COVID year
+      season_label %in% c("2015-2016","2018-2019", "2023-2024", "2024-2025") ~ "A/H1N1pdm09",
       TRUE ~ "A/H3N2"
     )
   )
@@ -252,7 +253,7 @@ case_pl_1<-ggplot(daily_case_data, aes(x = day_in_season, y = rolling_mean, colo
   geom_line(size = 1) +
   #coord_cartesian(ylim=c(0,1500))+
   theme_bw()+
-  facet_wrap(~season_label, ncol = 2,scales="free_y") +  # vertical alignment
+  facet_wrap(~season_label, ncol = 2) +  # vertical alignment
   scale_color_brewer(palette = "Dark2")+
   #scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   #scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
@@ -287,7 +288,7 @@ p_Rt_1
 pl<-case_pl_1/p_Rt_1
 pl
 
-ggsave("rt_estimates_plots/rt_estimates_by_pandemic_phase_and_season_x1.png",pl,height =14 ,width = 10)
+ggsave("rt_estimates_plots/rt_estimates_by_pandemic_phase_and_season_x2.png",pl,height =14 ,width = 10)
 
 
 
