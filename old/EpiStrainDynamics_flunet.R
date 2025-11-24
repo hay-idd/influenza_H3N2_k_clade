@@ -9,7 +9,7 @@ setwd("~/Documents/GitHub/influenza_H3N2_k_clade/")
 rstan::rstan_options(auto_write = TRUE)
 options(mc.cores = 4)
 
-flunet <- read_csv("data/WHo FluNet/FlunetData_United Kingdom, England_All Sites_for_02 January 2012 to 27 October 2025.csv") %>% select(-1)
+flunet <- read_csv("data/WHO_FluNet/England_All Sites_02Jan2012_27Oct2025.csv") %>% select(-1)
 
 head(flunet)
 
