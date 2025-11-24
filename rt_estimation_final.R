@@ -97,6 +97,22 @@ daily_case_data <- daily_data %>%
     day_in_season = as.numeric(date - as.Date(paste0(season_year, "-09-01")))
   )
 
+
+
+
+daily_case_data <- daily_data %>%
+  mutate(
+    season_year = if_else(month(date) >= 9, year(date), year(date) - 1),
+    season_label = paste0(season_year, "-", season_year + 1),
+    day_in_season = as.numeric(date - as.Date(paste0(season_year, "-09-01"))),
+    subtype = case_when(
+      season_label == "2020-2021" ~ "NA (COVID-19 pandmeic)",  # COVID year
+      season_label %in% c("2015-2016",,"2018-2019", "2023-2024", "2024-2025") ~ "A/H1N1pdm09",
+      TRUE ~ "A/H3N2"
+    )
+  )
+
+
 p_incidence <- ggplot(daily_case_data, aes(x = day_in_season, y = rolling_mean)) +
   geom_line(color = "steelblue", linewidth = 1) +
   facet_wrap(~ season_label, scales = "free") +
@@ -116,12 +132,33 @@ Rt_df <- data.frame(
 
 
 
+#Rt_df <- Rt_df %>%
+#  mutate(
+  #  season_year = if_else(month(date) >= 9, year(date), year(date) - 1),
+  #  season_label = paste0(season_year, "-", season_year + 1),
+ #   day_in_season = as.numeric(date - as.Date(paste0(season_year, "-09-01"))) # day 0 = September 1
+ # )
+
+
+
+
+
+
+
 Rt_df <- Rt_df %>%
   mutate(
     season_year = if_else(month(date) >= 9, year(date), year(date) - 1),
     season_label = paste0(season_year, "-", season_year + 1),
-    day_in_season = as.numeric(date - as.Date(paste0(season_year, "-09-01"))) # day 0 = September 1
+    day_in_season = as.numeric(date - as.Date(paste0(season_year, "-09-01"))), # day 0 = September 1
+    subtype = case_when(
+      season_label == "2020-2021" ~"NA (COVID-19 pandmeic)",
+      season_label %in% c("2015-2016",,"2018-2019", "2023-2024", "2024-2025") ~ "A/H1N1pdm09",
+      TRUE ~ "A/H3N2"
+    )
   )
+
+
+
 
 # 2. Plot Rt by season using facet_wrap
 p_Rt <- ggplot(Rt_df, aes(x = day_in_season, y = Rt_mean)) +
@@ -211,12 +248,13 @@ Rt_df <- subset(Rt_df, !(season_label %in% years_to_remove))
 daily_case_data<-subset(daily_case_data, !(season_label %in% years_to_remove))
 
 
-case_pl_1<-ggplot(daily_case_data, aes(x = day_in_season, y = rolling_mean, color = pandemic_phase)) +
+case_pl_1<-ggplot(daily_case_data, aes(x = day_in_season, y = rolling_mean, color = subtype)) +
   geom_line(size = 1) +
   #coord_cartesian(ylim=c(0,1500))+
   theme_bw()+
   facet_wrap(~season_label, ncol = 2,scales="free_y") +  # vertical alignment
-  scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
+  scale_color_brewer(palette = "Dark2")+
+  #scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   #scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   labs(title = "Daily incidence (interpolated) by influenza season",
        x = "Day in season (season starts September 1)", y = "Daily incidence") +
@@ -226,17 +264,19 @@ case_pl_1<-ggplot(daily_case_data, aes(x = day_in_season, y = rolling_mean, colo
 case_pl_1
 
 
-p_Rt_1 <- ggplot(Rt_df, aes(x = day_in_season, y = Rt_mean, color = pandemic_phase)) +
+p_Rt_1 <- ggplot(Rt_df, aes(x = day_in_season, y = Rt_mean, color = subtype)) +
   geom_line(size = 1) +
   coord_cartesian(ylim = c(0, 2.5)) +
   geom_hline(yintercept = 1.2, linetype = "dotted", color = "darkred", size = .5) +
   geom_hline(yintercept = 1.4, linetype = "dotted", color = "darkred", size = .5) +
-  geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper, fill = pandemic_phase), alpha = 0.4, color = NA) +
+  geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper, fill = subtype), alpha = 0.4, color = NA) +
   facet_wrap(~season_label, ncol = 2) +
   theme_bw()+
   geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
-  scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
-  scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
+  scale_color_brewer(palette = "Dark2")+
+  scale_fill_brewer(palette = "Dark2")+
+ # scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
+  #scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   labs(title = "Estimated effective reproduction number (Rt) by influenza season",
        x = "Day in season (season starts September 1)", y = expression("Estimated " * R[t])) +
   theme(legend.title = element_blank(),
@@ -264,7 +304,7 @@ Rt_df_shifted <- Rt_df %>%
   left_join(peak_dates, by = "season_label", suffix = c("", "_peak")) %>%
   mutate(days_since_peak = as.numeric(date - peak_date))
 
-p_Rt_shifted_1 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean, color = pandemic_phase)) +
+p_Rt_shifted_1 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean, color = subtype)) +
   geom_line(size = 1) +
   coord_cartesian(ylim=c(0,2.5))+
   xlim(c(-50,50))+
@@ -276,11 +316,13 @@ p_Rt_shifted_1 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean, co
                                    label = paste0(  "Peak on ", peak_dates$peak_date, " \n with Rt= ",
                                                     round(peak_dates$peak_Rt, 2)," (",round(peak_dates$Rt_lower, 2),",",round(peak_dates$Rt_upper, 2),")", "") ), 
             inherit.aes = FALSE,    color = "darkred",     vjust = -0.5,   size = 3  ) +
-  geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper, fill = pandemic_phase), alpha = 0.4, color = NA) +
+  geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper, fill = subtype), alpha = 0.4, color = NA) +
   facet_wrap(~ season_label, ncol = 2) +
   geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
-  scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
-  scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
+  scale_color_brewer(palette = "Dark2")+
+  scale_fill_brewer(palette = "Dark2")+
+  #scale_color_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
+ # scale_fill_manual(values = c("Pre-pandemic" = "#1b9e77", "Pandemic" = "#d95f02", "Post-pandemic" = "#7570b3")) +
   labs(title = "Rt estimates aligned to peak pre-Christmas Rt",
        x = "Days since peak Rt", y = expression("Estimated " * R[t])) +
   theme(legend.position = "bottom")+
