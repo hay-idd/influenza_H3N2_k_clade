@@ -8,8 +8,6 @@ For full details please see our pre-print:
 
 DOI - https://doi.org/10.5281/zenodo.17704679
 
-### Performing scenario analysis using the Shiny app.
-
 The easiest way to run the model is to visit the Shiny app hosted at:
 
 <https://hay-idd.shinyapps.io/ModelFluUk-H3N2/>
