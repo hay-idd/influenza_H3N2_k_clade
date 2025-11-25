@@ -9,11 +9,13 @@ For full details please see our pre-print:
 ### Performing scenario analysis using the Shiny app.
 
 The easiest way to run the model is to visit the Shiny app hosted at:
+
 <https://hay-idd.shinyapps.io/ModelFluUk-H3N2/>
 
 You can also run the app locally by running the app.R file in the `ModelFluUk-H3N2` directory.
 
 The app allows users to modify various parameters and explore the resulting impact on flu timing, epidemic size and peak incidence across age groups. The parameters which can be modified are explained below:
-* 
+
+- **`Basic reproductive number R0`** *(float, default=2)*
 
 
