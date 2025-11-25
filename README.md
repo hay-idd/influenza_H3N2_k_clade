@@ -4,7 +4,9 @@ This repo provides analysis and code used to explore and model seasonal H3N2 inf
 
 For full details please see our pre-print:
 
-<https://www.medrxiv.org/>
+[Link to zenodo](https://zenodo.org/records/17704679)
+
+DOI - https://doi.org/10.5281/zenodo.17704679
 
 ### Performing scenario analysis using the Shiny app.
 
