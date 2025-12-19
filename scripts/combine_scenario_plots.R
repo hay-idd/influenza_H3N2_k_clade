@@ -5,6 +5,7 @@ library(ggplot2)
 # ---- CONFIG ----
 plots_dir <- "~/Documents/GitHub/influenza_H3N2_k_clade/scenarios//" # each subfolder must contain one .RData with 'res' (and optionally 'plot_obj'/'plot_data')
 out_png   <- "combined_facet_plot.png"
+out_pdf   <- "combined_facet_plot.pdf"
 save_wd <- "~/Documents/GitHub/influenza_H3N2_k_clade/figures/"
 ncol_out  <- 2
 age_group_key_plot <- c("inc_1_1" = "[0,5)", "inc_2_1" = "[5,18)", "inc_3_1" = "[18,65)", "inc_4_1" = "65+")
@@ -184,6 +185,13 @@ p
 
 # Save
 ggsave(paste0(save_wd,out_png), p, width = 9, height = 11, dpi = 300)
+ggsave(paste0(save_wd,out_pdf), p+
+         theme(axis.text = element_text(size=12),
+               axis.title = element_text(size=14),
+               strip.text = element_text(size=14),
+               legend.title=element_text(size=12),
+               legend.text=element_text(size=12),
+               title = element_text(size=16)), width = 12, height = 12, dpi = 300)
 message("Saved combined plot: ", out_png)
 
 ## Pull out just over 65
@@ -292,7 +300,9 @@ p_from_p2 <- ggplot(combined_p2 %>% filter(!is.na(date) & !is.na(log_growth)) %>
 
 print(p_from_p2)
 out_png <- "combined_growth_rates.png"
+out_pdf <- "combined_growth_rates.pdf"
 ggsave(paste0(save_wd,out_png), p_from_p2, width = 9, height = 11, dpi = 300)
+ggsave(paste0(save_wd,out_pdf), p_from_p2, width = 9, height = 11, dpi = 300)
 
 
 

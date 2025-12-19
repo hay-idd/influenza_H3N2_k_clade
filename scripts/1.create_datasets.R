@@ -81,7 +81,6 @@ p_ili_by_age <- ggplot(ili_cases_comb_expanded_grouped) +
   ylab("ILI cases (RCGP, England, by age group)") +
   scale_x_date(date_labels="%b %Y",date_breaks="1 year") +
   scale_colour_brewer(palette="Set1",name="Age group")
-
 ######################################################
 ## Second dataset -- % of tests which are positive for influenza
 ######################################################
@@ -175,13 +174,16 @@ write_csv(final_dataset,"data/final/ili_plus_datasets_by_age.csv")
 
 
 ## Compare to UKHSA influenza case counts England 2009-2025
-influenza_cases_eng <- read_csv("data/ukhsa/case_counts_england_2009_2025.csv")
-influenza_cases_eng$Date <- lubridate::dmy(influenza_cases_eng$Date)
-influenza_cases_eng <- influenza_cases_eng %>% rename(date=Date,Week=`Week number`) %>% mutate(Year=lubridate::year(date))
-write_csv(influenza_cases_eng,"data/final/england_h3_cases_historic.csv")
-
+#influenza_cases_eng <- read_csv("data/ukhsa/case_counts_england_2009_2025.csv")
+#influenza_cases_eng$Date <- lubridate::dmy(influenza_cases_eng$Date)
+#influenza_cases_eng <- influenza_cases_eng %>% rename(date=Date,Week=`Week number`) %>% mutate(Year=lubridate::year(date))
+#write_csv(influenza_cases_eng,"data/final/england_h3_cases_historic.csv")
+influenza_cases_eng <- read_csv("data/final/england_h3_cases_historic_manual.csv")
+influenza_cases_eng$date <- lubridate::dmy(influenza_cases_eng$date)
 ## Compare to WHO FluNet data
 flunet_data <- read_csv("data/WHO_FluNet/England_All Sites_02Jan2012_27Oct2025.csv") %>% select(-1)
+flunet_data <- read_csv("data/WHO_FluNet/FlunetData_United Kingdom, England_All Sites_for_01 January 1995 to 01 December 2025.csv") %>% select(-1) %>% select(-c(11:14))
+
 colnames(flunet_data) <- c("country","surv_type","year_week","week_start","N","flu_pos","flu_neg","H1N1pdm","H3","not_subtyped")
 ## Create integer time index from the weeks
 t_start <- flunet_data$week_start[1]

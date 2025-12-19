@@ -161,7 +161,7 @@ fit_gam_grs <- function(dat, y = "y", time = "time_w", group = NULL, epsilon = 0
   
   fit_one <- function(df) {
     k <- max(5, round(nrow(df) / 8))
-    fm <- as.formula(paste0("log_y ~ s(", time, ", bs = 'ps', k = ", k, ")"))
+    fm <- as.formula(paste0("log_y ~ s(", time, ", bs = 'tp', k = ", k, ")"))
     fit <- gam(fm, data = df, method = "REML", select = TRUE)
     pr <- predict(fit, newdata = df, se.fit = TRUE, unconditional = TRUE)
     df$fitted_log <- pr$fit
@@ -322,4 +322,20 @@ season_from_date <- function(dates, start_month = 7) {
   res <- sprintf("%d/%02d", start_y, end_y %% 100)
   res[na_idx] <- NA_character_
   res
+}
+
+flu_season <- function(date) {
+  date <- as.Date(date)
+  
+  start_year <- ifelse(
+    format(date, "%m") >= "07",
+    as.integer(format(date, "%Y")),
+    as.integer(format(date, "%Y")) - 1
+  )
+  
+  paste0(
+    start_year,
+    "/",
+    substr(start_year + 1, 3, 4)
+  )
 }

@@ -8,7 +8,7 @@ library(tidyr)
 library(ggthemes)
 
 #set the working directory 
-setwd("~/Documents/GitHub/recent_influenza/Untitled")
+setwd("~/Documents/GitHub/influenza_H3N2_k_clade/")
 
 
 #read the data:fluenet data 
@@ -313,10 +313,10 @@ p_Rt_shifted_1 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean, co
   theme_bw()+
   geom_vline(xintercept = 0, linetype = "dotted", color = "darkred") +
   # Add text labels for peak Rt  
-  geom_text(data = peak_dates, aes(x = -30, y = 2, 
+  geom_text(data = peak_dates, aes(x = -28, y = 1.75, 
                                    label = paste0(  "Peak on ", peak_dates$peak_date, " \n with Rt= ",
                                                     round(peak_dates$peak_Rt, 2)," (",round(peak_dates$Rt_lower, 2),",",round(peak_dates$Rt_upper, 2),")", "") ), 
-            inherit.aes = FALSE,    color = "darkred",     vjust = -0.5,   size = 3  ) +
+            inherit.aes = FALSE,    color = "darkred",     vjust = -0.5,   size = 4  ) +
   geom_ribbon(aes(ymin = Rt_lower, ymax = Rt_upper, fill = subtype), alpha = 0.4, color = NA) +
   facet_wrap(~ season_label, ncol = 2) +
   geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
@@ -327,13 +327,18 @@ p_Rt_shifted_1 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean, co
   labs(title = "Rt estimates aligned to peak pre-Christmas Rt",
        x = "Days since peak Rt", y = expression("Estimated " * R[t])) +
   theme(legend.position = "bottom")+
-  theme(legend.title = element_blank())
+  theme(legend.title = element_blank(),
+        axis.text = element_text(size=12),
+        axis.title = element_text(size=14),
+        strip.text = element_text(size=14),
+        title = element_text(size=16))
 
 p_Rt_shifted_1
 
 
 
 ggsave("rt_estimates_plots/pre-Christmas_rt_estimates_by_season_1_before_chrismas_day_x1.png",p_Rt_shifted_1,height =12 ,width = 10)
+ggsave("rt_estimates_plots/pre-Christmas_rt_estimates_by_season_1_before_chrismas_day_x1.pdf",p_Rt_shifted_1,height =12 ,width = 10)
 
 
 # Peak Rt per season 

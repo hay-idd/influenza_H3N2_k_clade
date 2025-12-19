@@ -256,7 +256,7 @@ server <- function(input, output, session) {
   
   
   output$about_csv <- DT::renderDataTable({
-    df <- read.csv("data/final/flu_2022_2023.csv", 
+    df <- read.csv("data/final/flu_2022_2023_new.csv", 
                    stringsAsFactors = FALSE) %>%
       head(10)
     
@@ -271,7 +271,7 @@ server <- function(input, output, session) {
   
   flu_dat <- reactive({
     if (is.null(input$file)) {
-      read_csv("data/final/flu_2022_2023.csv")
+      read_csv("data/final/flu_2022_2023_new.csv")
     } else {
       read_csv(input$file$datapath)
     }
@@ -316,7 +316,7 @@ server <- function(input, output, session) {
     polymod_c_term <- cm$polymod_term
     
     # weights
-    weights_res <- make_weights_df(start_date, end_date, smooth_time = 7)
+    weights_res <- make_weights_df(start_date, end_date, smooth_time = 1)
     weights_df <- weights_res$weights
     
     # apply overall immune escape multiplier to age-group immunity sliders

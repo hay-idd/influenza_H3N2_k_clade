@@ -5,11 +5,12 @@ library(data.table)
 library(pracma)
 library(deSolve)
 library(patchwork)
-setwd("~/Documents/GitHub/influenza_H3N2_k_clade/shiny_app/")
+setwd("~/Documents/GitHub/influenza_H3N2_k_clade/ModelFluUk-H3N2//")
 # ---- SOURCE helper files (must exist in same project) ----
 source("auxiliary_funcs.R")   # contains setup_period_tibble, setup_holiday_tibble, etc.
 source("sir_functions.R")     # contains get_beta, setup_C, epi_ode_size
-
+source("helper_funcs.R")
+source("vars.R")
 # ---- CONSTANTS (copied from app) ----
 half_term_start <- as.Date("2022-10-21")
 half_term_end   <- as.Date("2022-10-30")
@@ -113,7 +114,6 @@ run_model_once <- function(params) {
   # run model
   y_base <- epi_ode_size(C_list, beta_par, p$gamma, N, ts = ts,
                          alphas = alphas,
-                         initial_immune_frac = 0,
                          age_seed = 3, immunity_seed = 1,
                          seed_size = p$seed_size, return_compartments = TRUE)
   
@@ -317,7 +317,7 @@ results_tbl_R0_long <- results_tbl_R0 %>% mutate(Scenario = "R0") %>% select(R0,
   rename(`Final size`=final_size_infections,
          `Final size 65+`=final_size_65plus,
          `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic,
-         `November week 1 growth rate`=gr_early_nov) %>%
+         `November week 1\n growth rate`=gr_early_nov) %>%
   pivot_longer(-c(variable,Scenario))
 
 ## Create data for varying Seed time
@@ -326,7 +326,7 @@ results_tbl_seed_long <- results_tbl_seed %>% mutate(Scenario = "Seed time") %>%
   rename(`Final size`=final_size_infections,
          `Final size 65+`=final_size_65plus,
          `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic,
-         `November week 1 growth rate`=gr_early_nov) %>%
+         `November week 1\n growth rate`=gr_early_nov) %>%
   pivot_longer(-c(variable,Scenario))
 
 
@@ -336,7 +336,7 @@ results_tbl_escape_long <- results_tbl_escape %>% mutate(Scenario = "Immune esca
   rename(`Final size`=final_size_infections,
          `Final size 65+`=final_size_65plus,
          `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic,
-         `November week 1 growth rate`=gr_early_nov) %>%
+         `November week 1\n growth rate`=gr_early_nov) %>%
   pivot_longer(-c(variable,Scenario))
 
 ## Create data for varying Immune escape in younger ages
@@ -345,7 +345,7 @@ results_tbl_young_escape_long <- results_tbl_young_escape %>% mutate(Scenario = 
   rename(`Final size`=final_size_infections,
          `Final size 65+`=final_size_65plus,
          `Peak infection incidence \nper 100,000`=estimated_peak_symptomatic,
-         `November week 1 growth rate`=gr_early_nov) %>%
+         `November week 1\n growth rate`=gr_early_nov) %>%
   pivot_longer(-c(variable,Scenario))
 
 
@@ -355,13 +355,13 @@ gr_flunet <- read_csv("../results/flunet_h3_growth_rates.csv") %>% filter(season
   select(y,lb_95,ub_95) %>% mutate(Dataset="WHO FluNet") %>%
   
   mutate(Label="WHO FluNet") %>%
-  mutate(name = "November week 1 growth rate")
+  mutate(name = "November week 1\n growth rate")
 
 rcgp_dat <- read_csv("../results/RCGP_growth_rates_by_age.csv") %>% filter(agegroup=="All",Season=='2025 to 2026') %>%
   mutate(month = month(date)) %>% filter(month %in% c(11)) %>% group_by(month) %>% filter(date == min(date)) %>%
   select(y,lb_95,ub_95) %>% mutate(Dataset="RCGP") %>% 
   mutate(Label="RCGP") %>%
-  mutate(name = "November week 1 growth rate")
+  mutate(name = "November week 1\n growth rate")
 
 
 gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)
@@ -442,7 +442,16 @@ p_seed <- ggplot(results_tbl_seed_long) +
   theme_bw() +
   theme(legend.position="bottom")
 p_seed
-p_main <- p_r0/p_escape/p_escape_young/p_seed + plot_layout(guides="collect")&
-  theme(legend.position='none')
+p_main <- p_r0/
+  p_escape/
+  p_escape_young/
+  p_seed + plot_layout(guides="collect")&
+  theme(legend.position='none',axis.text = element_text(size=12),
+        axis.title = element_text(size=14),
+        strip.text = element_text(size=12),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        title = element_text(size=16))
 
 ggsave("~/Documents/GitHub/influenza_H3N2_k_clade/figures/fig_model_grid_results.png", p_main, width=10, height=10)
+ggsave("~/Documents/GitHub/influenza_H3N2_k_clade/figures/fig_model_grid_results.pdf", p_main, width=10, height=10)

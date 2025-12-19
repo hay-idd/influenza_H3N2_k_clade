@@ -11,9 +11,9 @@ files_total_samples <- files[which(files %like% "total_samples_tested") ]
 read_csv(files_total_samples[1])
 total_samples <- lapply(files_total_samples,function(x) read_csv(x, col_names=FALSE))
 
+dates <- seq(as.Date("2022-01-03"),as.Date("2023-12-25"),by="weeks")
 all_dates <- tibble(x_floor=1:nrow(total_samples[[1]]) + 20,date=dates)
 age_groups <- c("19-64","5-18","65+","<5")
-dates <- seq(as.Date("2022-01-03"),as.Date("2023-12-25"),by="weeks")
 for(i in 1:length(total_samples)){
   total_samples[[i]]$t <- 1:nrow(total_samples[[i]])
   total_samples[[i]]$date <- dates[total_samples[[i]]$t]

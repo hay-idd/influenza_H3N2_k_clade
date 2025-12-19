@@ -1,4 +1,4 @@
-library(EpiStrainDynamics)
+#library(EpiStrainDynamics)
 library(ggplot2)
 library(rstan)
 library(RColorBrewer)
@@ -7,6 +7,7 @@ library(lubridate)
 library(tidyverse)
 library(data.table)
 library(mgcv)
+library(ggrepel)
 
 setwd("~/Documents/GitHub/influenza_H3N2_k_clade/")
 source("R/funcs.R")
@@ -39,15 +40,16 @@ overall_ILIplus <- overall_ILIplus %>%
 overall_ILIplus$Season <- season_from_date(overall_ILIplus$date)
 
 ## England case counts
-case_counts <- read_csv("data/ukhsa/case_counts_england_2009_2025.csv")
-case_counts$date <- lubridate::dmy(case_counts$Date)
+#case_counts <- read_csv("data/ukhsa/case_counts_england_2009_2025.csv")
+case_counts <- read_csv("data/final/england_h3_cases_historic_manual.csv")
+case_counts$date <- lubridate::dmy(case_counts$date)
 case_counts <- case_counts %>% mutate(total = `Influenza A not subtyped` + `Influenza A H1N1pdm09` + `Influenza A H3N2` + `Influenza B`) 
 case_counts <- case_counts %>%
   mutate(total_tested = `Influenza A H1N1pdm09` + `Influenza A H3N2` + `Influenza B`,
          inferred_H3 = `Influenza A not subtyped` * `Influenza A H3N2`/total_tested,
          inferred_H3 = if_else(is.na(inferred_H3),0,inferred_H3),
          inferred_H3 = inferred_H3 + `Influenza A H3N2`) %>%
-  rename(Week = `Week number`) %>%
+  rename(Week = `Week`) %>%
   mutate(Year = lubridate::year(date)) %>%
   select(Week,Year,date,inferred_H3, total) %>%
   rename(cases_H3=inferred_H3,cases_total=total) %>% 
@@ -199,7 +201,7 @@ rcgp_h3_gr %>% filter(group != "15-44") %>%
 ## Incidence plots
 p_inc_h3 <- plot_incidence(all_grs_H3,x="date",y="cases_H3",color="Source",point=FALSE) + 
   scale_color_brewer("Source",palette = "Set1") + xlab("Date (end of Epi week)") +
-  ylab("Weekly cases of confirmed or suspected A/H3N2") + theme_use
+  ylab("Weekly cases of confirmed\n or suspected A/H3N2") + theme_use
 
 p_inc_h3_recent <- plot_incidence(all_grs_H3 %>% filter(Year >= 2021),x="date",y="cases_H3",color="Source",point=FALSE) + 
   scale_color_brewer("Source",palette = "Set1") + xlab("Date (end of Epi week)") +
@@ -248,6 +250,12 @@ ggsave("figures/raw_data/p_gr_h3_age.png",p_gr_h3_age,width=8,height=7)
 ggsave("figures/raw_data/p_gr_all_age.png",p_gr_all_age,width=8,height=7)
 
 ggsave("figures/raw_data/p_inc_h3.png",p_inc_h3,width=7,height=4)
+ggsave("figures/raw_data/p_inc_h3.pdf",p_inc_h3,width=7,height=4)
+ggsave("figures/raw_data/p_inc_h3.pdf",p_inc_h3 + theme(legend.position=c(0.2,0.7),
+axis.text = element_text(size=12),
+axis.title = element_text(size=14),
+strip.text = element_text(size=14),
+title = element_text(size=16)),width=5,height=3)
 ggsave("figures/raw_data/p_inc_h3_recent.png",p_inc_h3_recent,width=7,height=4)
 ggsave("figures/raw_data/p_inc_all.png",p_inc_all_recent,width=7,height=4)
 ggsave("figures/raw_data/p_inc_all_recent.png",p_inc_all,width=7,height=4)
@@ -265,27 +273,36 @@ index <- 1
 
 overall_ILIplus <- overall_ILIplus %>% select(Year,Week,date,group,ILIplus,Season)
 overall_ILIplus <- overall_ILIplus %>% bind_rows(overall_ILIplus %>% group_by(Year,Week,date,Season) %>% summarize(ILIplus = sum(ILIplus)) %>% mutate(group="All"))
+
 for(agegroup in unique(overall_ILIplus$group)){
-  all_dat_tmp <- overall_ILIplus %>% filter(group == agegroup)
+  all_dat_tmp <- overall_ILIplus %>% filter(group == agegroup) #%>% filter(Year == 2025 & Week >= 30)
   scale <- 1
   ## Upscale counts to get convergence
   if(agegroup != "All") scale <- 10
+  all_dat_tmp$cases <- round(all_dat_tmp$ILIplus)
+  all_dat_tmp$time <- as.numeric(as.factor(all_dat_tmp$date))
+  all_dat_tmp <- all_dat_tmp %>% select(cases, time)
+  #all_dat_tmp$key <- 1:nrow(all_dat_tmp)
   mod <- construct_model(
-    #method = random_walk(), 
-    method=p_spline(spline_degree = 3, days_per_knot = 3),
+    method = random_walk(), 
+    #method=p_spline(spline_degree = 3, days_per_knot = 3),
     pathogen_structure =single(
-      case_timeseries = round((all_dat_tmp$ILIplus*scale)),           # timeseries of case data
-      time = as.numeric(as.factor(all_dat_tmp$date)),                       # date or time variable labels
-      pathogen_name = 'Influenza A/H3'                # optional name of pathogen
+      data=all_dat_tmp,
+      case_timeseries = "cases",           # timeseries of case data
+      time = "time"                      # date or time variable labels
+    ), 
+    smoothing_params = smoothing_structure(   # independent smoothing structure 
+      tau_mean = c(0),           # parameter - one for each pathogen
+      tau_sd = c(0.05)
     ),
     dow_effect = FALSE
   )
   
   fit <- fit_model(
     mod,
-    iter = 2000,
-    warmup = 1000,
-    chains = 3
+    n_iter = 2000,
+    n_warmup = 1000,
+    n_chain = 3
   )
   
   gr <- growth_rate(fit)
@@ -337,12 +354,12 @@ p_gr_by_age <- ggplot(tmp_dat_all) +
             alpha = 0.4) +  
   geom_hline(yintercept=0,linetype="dashed") +
   geom_ribbon(aes(x=date,ymin=lb_95,ymax=ub_95,fill=agegroup),alpha=0.5) +
-  geom_line(aes(x=date,y=y,col=agegroup,alpha="P-spline"),linewidth=0.75) +
+  geom_line(aes(x=date,y=y,col=agegroup,alpha="Random walk"),linewidth=0.75) +
   geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup,alpha="Raw data")) +
   scale_fill_brewer("Age group", palette = "Set2") +
   scale_color_brewer("Age group", palette = "Set2") +
   xlab("Week") + ylab('Growth rate (per week)') +
-  scale_alpha_manual(values=c("Raw data"=0.25,"P-spline"=1),name="Growth rate type")+
+  scale_alpha_manual(values=c("Raw data"=0.25,"Random walk"=1),name="Growth rate type")+
   theme_use + facet_wrap(~agegroup,ncol=2) +
   scale_y_continuous(breaks=seq(-1,1,by=0.2)) +
   coord_cartesian(ylim=c(-1.2,1.2)) +
@@ -523,22 +540,30 @@ write_csv(tmp_dat_shifted,"results/RCGP_growth_rates_by_age_shifted.csv")
 flunet <- read_csv("data/final/flunet_h3_cases_historic.csv")
 flunet <- flunet %>% mutate(H3_sum = if_else(is.na(H3_sum),0,H3_sum))
 
+
+dat_tmp <- flunet %>% filter(Year >= 2011)
+dat_tmp$H3_sum <- round(dat_tmp$H3_sum)
+dat_tmp$time <- as.numeric(as.factor(dat_tmp$date))
 mod <- construct_model(
-  #method = random_walk(),
-  method=p_spline(spline_degree = 3, days_per_knot = 3), ## I report 3 in the paper, but this was originally 4 if you see things change a lot
+  method = random_walk(),
+  #method=p_spline(spline_degree = 3, days_per_knot = 3), ## I report 3 in the paper, but this was originally 4 if you see things change a lot
   pathogen_structure =single(
-    case_timeseries = round((flunet$H3_sum)),           # timeseries of case data
-    time = as.numeric(as.factor(flunet$date)),                       # date or time variable labels
-    pathogen_name = 'Influenza A/H3'                # optional name of pathogen
+    data=dat_tmp,
+    case_timeseries = "H3_sum",           # timeseries of case data
+    time = "time"                       # date or time variable labels
+  ),
+  smoothing_params = smoothing_structure(   # independent smoothing structure 
+    tau_mean = c(0),           # parameter - one for each pathogen
+    tau_sd = c(0.25)
   ),
   dow_effect = FALSE
 )
 
 fit <- fit_model(
   mod,
-  iter = 2000,
-  warmup = 1000,
-  chains = 3
+  n_iter = 4000,
+  n_warmup = 2000,
+  n_chain = 3
 )
 
 gr <- growth_rate(fit)
@@ -549,27 +574,9 @@ time_key_flunet <- flunet %>% select(Year, Week, date) %>%
   mutate(time = as.numeric(as.factor(date)))
 gr_flunet_dat <- gr_flunet_dat %>% left_join(time_key_flunet)
 
-## For later years, just assign season manually
+## Convert dates to flu season
 gr_flunet_dat <- gr_flunet_dat %>%
-  mutate(season = case_when(
-    date >= as.Date("2011-07-01") & date < as.Date("2012-07-01") ~ "2011/12",
-    date >= as.Date("2012-07-01") & date < as.Date("2013-07-01") ~ "2012/13",
-    date >= as.Date("2013-07-01") & date < as.Date("2014-07-01") ~ "2013/14",
-    date >= as.Date("2014-07-01") & date < as.Date("2015-07-01") ~ "2014/15",
-    date >= as.Date("2015-07-01") & date < as.Date("2016-07-01") ~ "2015/16",
-    date >= as.Date("2016-07-01") & date < as.Date("2017-07-01") ~ "2016/17",
-    date >= as.Date("2017-07-01") & date < as.Date("2018-07-01") ~ "2017/18",
-    date >= as.Date("2018-07-01") & date < as.Date("2019-07-01") ~ "2018/19",
-    date >= as.Date("2019-07-01") & date < as.Date("2020-07-01") ~ "2019/20",
-    date >= as.Date("2020-07-01") & date < as.Date("2021-07-01") ~ "2020/21",
-    date >= as.Date("2021-07-01") & date < as.Date("2022-07-01") ~ "2021/22",
-    date >= as.Date("2022-07-01") & date < as.Date("2023-07-01") ~ "2022/23",
-    date >= as.Date("2023-07-01") & date < as.Date("2024-07-01") ~ "2023/24",
-    date >= as.Date("2024-07-01") & date < as.Date("2025-07-01") ~ "2024/25",
-    date >= as.Date("2025-07-01") & date < as.Date("2026-07-01") ~ "2025/26",
-    TRUE ~ NA
-  ))
-
+  dplyr::mutate(season = flu_season(date))
 
 
 p_gr_flunet <- ggplot(data=gr_flunet_dat) + 
@@ -610,8 +617,8 @@ p_gr_flunet_by_day<- ggplot(data=gr_flunet_dat) +
   xlab("Day of year (start of Epi week)") + ylab('Growth rate (per week)') +
   #scale_color_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
   #scale_fill_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
-  scale_color_viridis_d("Time period") +
-  scale_fill_viridis_d("Time period") +
+  scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
   scale_y_continuous(limits=c(-1.2,1.2),breaks=seq(-1.2,1.2,by=0.2)) +
   theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
@@ -647,8 +654,8 @@ p_gr_flunet_by_peak <- ggplot(data=gr_flunet_dat %>% filter(day_shifted <= 100, 
   xlab("Day relative to peak") + ylab('Growth rate (per week)') +
   #scale_color_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
   #scale_fill_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
-  scale_color_viridis_d("Time period") +
-  scale_fill_viridis_d("Time period") +
+  scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
   theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
 
@@ -659,8 +666,8 @@ p_gr_flunet_by_day_faceted <- ggplot(data=gr_flunet_dat) +
   geom_ribbon(aes(x=day_of_year,ymin=lb_50,ymax=ub_50,group=season,col="Estimate"),alpha=0.1) +
   geom_line(aes(x=day_of_year,y=y,group=season,col="Estimate")) +
   xlab("Day of year (start of Epi week)") + ylab('Growth rate (per week)') +
-  scale_color_viridis_d("Time period") +
-  scale_fill_viridis_d("Time period") +
+  scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
   #scale_y_continuous(limits=c(-1.2,1.2),breaks=seq(-1.2,1.2,by=0.2)) +
   coord_cartesian(ylim=c(-1,1)) +
   theme_use + 
@@ -678,6 +685,13 @@ gr_flunet_dat %>% left_join(flunet) %>% filter(day_shifted <= 0) %>% group_by(se
 
 ggsave("figures/growth_rates/flunet_h3_growth_rate.png",p_gr_flunet,width=7,height=4)
 ggsave("figures/growth_rates/flunet_h3_growth_rate_by_day.png",p_gr_flunet_by_day,width=7,height=4)
+ggsave("figures/growth_rates/flunet_h3_growth_rate_by_day.pdf",p_gr_flunet_by_day+
+         theme(axis.text = element_text(size=12),
+               axis.title = element_text(size=14),
+               strip.text = element_text(size=14),
+               legend.title=element_text(size=10),
+               legend.text=element_text(size=10),
+               title = element_text(size=16)),width=7,height=4)
 ggsave("figures/growth_rates/flunet_h3_growth_rate_by_peak.png",p_gr_flunet_by_peak,width=7,height=4)
 ggsave("figures/growth_rates/flunet_h3_growth_rate_by_day_faceted_ps.png",p_gr_flunet_by_day_faceted,width=7,height=7)
 
@@ -693,22 +707,30 @@ write_csv(gr_flunet_dat,"results/flunet_h3_growth_rates.csv")
 flunet <- read_csv("data/final/flunet_h3_cases_historic.csv")
 flunet <- flunet %>% mutate(flu_pos_sum = if_else(is.na(flu_pos_sum),0,flu_pos_sum))
 
+dat_tmp <- flunet
+dat_tmp$flu_pos_sum <- round(dat_tmp$flu_pos_sum)
+dat_tmp$time <- as.numeric(as.factor(dat_tmp$date))
+
 mod <- construct_model(
   #method = random_walk(),
   method=p_spline(spline_degree = 3, days_per_knot = 3),
   pathogen_structure =single(
-    case_timeseries = round((flunet$flu_pos_sum)),           # timeseries of case data
-    time = as.numeric(as.factor(flunet$date)),                       # date or time variable labels
-    pathogen_name = 'Influenza A/H3'                # optional name of pathogen
+    data=dat_tmp,
+    case_timeseries = "flu_pos_sum",           # timeseries of case data
+    time = "time"                       # date or time variable labels
+  ),
+  smoothing_params = smoothing_structure(   # independent smoothing structure 
+    tau_mean = c(0),           # parameter - one for each pathogen
+    tau_sd = c(0.5)
   ),
   dow_effect = FALSE
 )
 
 fit <- fit_model(
   mod,
-  iter = 2000,
-  warmup = 1000,
-  chains = 3
+  n_iter = 2000,
+  n_warmup = 1000,
+  n_chain = 3
 )
 
 gr <- growth_rate(fit)
@@ -719,28 +741,8 @@ time_key_flunet <- flunet %>% select(Year, Week, date) %>%
   mutate(time = as.numeric(as.factor(date)))
 gr_flunet_dat <- gr_flunet_dat %>% left_join(time_key_flunet)
 
-## For later years, just assign season manually
 gr_flunet_dat <- gr_flunet_dat %>%
-  mutate(season = case_when(
-    date >= as.Date("2011-07-01") & date < as.Date("2012-07-01") ~ "2011/12",
-    date >= as.Date("2012-07-01") & date < as.Date("2013-07-01") ~ "2012/13",
-    date >= as.Date("2013-07-01") & date < as.Date("2014-07-01") ~ "2013/14",
-    date >= as.Date("2014-07-01") & date < as.Date("2015-07-01") ~ "2014/15",
-    date >= as.Date("2015-07-01") & date < as.Date("2016-07-01") ~ "2015/16",
-    date >= as.Date("2016-07-01") & date < as.Date("2017-07-01") ~ "2016/17",
-    date >= as.Date("2017-07-01") & date < as.Date("2018-07-01") ~ "2017/18",
-    date >= as.Date("2018-07-01") & date < as.Date("2019-07-01") ~ "2018/19",
-    date >= as.Date("2019-07-01") & date < as.Date("2020-07-01") ~ "2019/20",
-    date >= as.Date("2020-07-01") & date < as.Date("2021-07-01") ~ "2020/21",
-    date >= as.Date("2021-07-01") & date < as.Date("2022-07-01") ~ "2021/22",
-    date >= as.Date("2022-07-01") & date < as.Date("2023-07-01") ~ "2022/23",
-    date >= as.Date("2023-07-01") & date < as.Date("2024-07-01") ~ "2023/24",
-    date >= as.Date("2024-07-01") & date < as.Date("2025-07-01") ~ "2024/25",
-    date >= as.Date("2025-07-01") & date < as.Date("2026-07-01") ~ "2025/26",
-    TRUE ~ NA
-  ))
-
-
+  dplyr::mutate(season = flu_season(date))
 
 p_gr_flunet_all <- ggplot(data=gr_flunet_dat) + 
   geom_hline(yintercept=0,linetype="dashed") +
@@ -771,7 +773,7 @@ gr_flunet_dat <- gr_flunet_dat %>%
     TRUE ~ "Other"
   ))
 
-p_gr_flunet_by_day<- ggplot(data=gr_flunet_dat) + 
+p_gr_flunet_by_day<- ggplot(data=gr_flunet_dat %>% filter(plot_label != "During pandemic")) + 
   geom_hline(yintercept=0,linetype="dashed") +
   geom_ribbon(aes(x=day_of_year,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
   # geom_ribbon(aes(x=day_of_year,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
@@ -780,9 +782,9 @@ p_gr_flunet_by_day<- ggplot(data=gr_flunet_dat) +
   xlab("Day of year (start of Epi week)") + ylab('Growth rate (per week)') +
   #scale_color_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
   #scale_fill_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
-  scale_color_viridis_d("Time period") +
-  scale_fill_viridis_d("Time period") +
-  scale_y_continuous(limits=c(-1.2,1.2),breaks=seq(-1.2,1.2,by=0.2)) +
+  scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,by=0.2)) +
   theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
 
@@ -806,30 +808,30 @@ max_gr %>% select(season, Year, Week, date, y, lb_95, ub_95) %>% arrange(season)
 ## Merge in raw data
 gr_flunet_dat <-gr_flunet_dat %>% left_join(flunet %>% mutate(gr = log((H3_sum+0.1)/lag(H3_sum+0.1,1)), gr_smooth = zoo::rollmean(gr, 4, fill=NA,align="right"))) 
 
-p_gr_flunet_by_peak <- ggplot(data=gr_flunet_dat %>% filter(day_shifted <= 100, day_shifted >= -100)) + 
+p_gr_flunet_by_peak <- ggplot(data=gr_flunet_dat %>% filter(day_shifted <= 100, day_shifted >= -100)%>% filter(plot_label != "During pandemic")) + 
   geom_hline(yintercept=0,linetype="dashed") +
   geom_ribbon(aes(x=day_shifted,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
   # geom_ribbon(aes(x=day_of_year,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
   geom_line(aes(x=day_shifted,y=y,group=season,col=plot_label)) +
-  scale_y_continuous(limits=c(-1.2,1.2),breaks=seq(-1.2,1.2,by=0.2)) +
+  scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,by=0.2)) +
   #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
   xlab("Day relative to peak") + ylab('Growth rate (per week)') +
   #scale_color_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
   #scale_fill_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
-  scale_color_viridis_d("Time period") +
-  scale_fill_viridis_d("Time period") +
+  scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
   theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
 
-p_gr_flunet_by_day_faceted <- ggplot(data=gr_flunet_dat) + 
+p_gr_flunet_by_day_faceted <- ggplot(data=gr_flunet_dat%>% filter(plot_label != "During pandemic")) + 
   geom_hline(yintercept=0,linetype="dashed") +
   geom_line(aes(x=day_of_year,y=gr,col="Raw data")) +
   geom_line(aes(x=day_of_year,y=gr_smooth,group=season,col="Smoothed data")) +
   geom_ribbon(aes(x=day_of_year,ymin=lb_50,ymax=ub_50,group=season,col="Estimate"),alpha=0.1) +
   geom_line(aes(x=day_of_year,y=y,group=season,col="Estimate")) +
   xlab("Day of year (start of Epi week)") + ylab('Growth rate (per week)') +
-  scale_color_viridis_d("Time period") +
-  scale_fill_viridis_d("Time period") +
+  scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
   #scale_y_continuous(limits=c(-1.2,1.2),breaks=seq(-1.2,1.2,by=0.2)) +
   coord_cartesian(ylim=c(-1,1)) +
   theme_use + 
@@ -855,27 +857,43 @@ write_csv(gr_flunet_dat,"results/flunet_all_growth_rates.csv")
 #############################################
 ## FOURTH fit to overall flu cases
 #############################################
-case_counts <- read_csv("data/ukhsa/case_counts_england_2009_2025.csv")
-case_counts$date <- lubridate::dmy(case_counts$Date)
+#case_counts <- read_csv("data/ukhsa/case_counts_england_2009_2025.csv")
+case_counts <- read_csv("data/final/england_h3_cases_historic_manual.csv")
+case_counts$date <- lubridate::dmy(case_counts$date)
+## Start from the 2011/12 season to miss the H1N1 pandemic
+case_counts <- case_counts %>% filter(date >= as.Date("2011-07-01"))
+## Drop last row
+case_counts <- case_counts[-nrow(case_counts),]
 case_counts <- case_counts %>% mutate(total = `Influenza A not subtyped` + `Influenza A H1N1pdm09` + `Influenza A H3N2` + `Influenza B`) 
-case_counts <- case_counts %>% mutate(Week=`Week number`,Year = year(date))
+case_counts <- case_counts %>% mutate(Week=`Week`,Year = year(date))
+
+
+case_counts1 <- case_counts
+case_counts1$total <- round(case_counts1$total)
+case_counts1$time <- as.numeric(as.factor(case_counts1$date))
+
 mod <- construct_model(
-  #method = random_walk(),
-  method=p_spline(spline_degree = 3, days_per_knot = 3),
+  method = random_walk(),
+  #method=p_spline(spline_degree = 3, days_per_knot = 3),
   pathogen_structure =single(
-    case_timeseries = round((case_counts$total)),           # timeseries of case data
-    time = as.numeric(as.factor(case_counts$date)),                       # date or time variable labels
-    pathogen_name = 'Influenza'                # optional name of pathogen
+    data=case_counts1,
+    case_timeseries = "total",           # timeseries of case data
+    time ="time"                       # date or time variable labels
+  ),
+  smoothing_params = smoothing_structure(   # independent smoothing structure 
+    tau_mean = c(0),           # parameter - one for each pathogen
+    tau_sd = c(1)
   ),
   dow_effect = FALSE
 )
 
 fit <- fit_model(
   mod,
-  iter = 2000,
-  warmup = 1000,
-  chains = 3
+  n_iter = 2000,
+  n_warmup = 1000,
+  n_chain = 3
 )
+
 
 gr <- growth_rate(fit)
 p_cases <- plot(gr)
@@ -885,33 +903,17 @@ time_key_cases <- case_counts %>% select(Year, Week, date) %>%
   mutate(time = as.numeric(as.factor(date)))
 gr_case_dat <- gr_case_dat %>% left_join(time_key_cases)
 
-## For later years, just assign season manually
+## Convert dates to flu season
 gr_case_dat <- gr_case_dat %>%
-  mutate(season = case_when(
-    date >= as.Date("2011-07-01") & date < as.Date("2012-07-01") ~ "2011/12",
-    date >= as.Date("2012-07-01") & date < as.Date("2013-07-01") ~ "2012/13",
-    date >= as.Date("2013-07-01") & date < as.Date("2014-07-01") ~ "2013/14",
-    date >= as.Date("2014-07-01") & date < as.Date("2015-07-01") ~ "2014/15",
-    date >= as.Date("2015-07-01") & date < as.Date("2016-07-01") ~ "2015/16",
-    date >= as.Date("2016-07-01") & date < as.Date("2017-07-01") ~ "2016/17",
-    date >= as.Date("2017-07-01") & date < as.Date("2018-07-01") ~ "2017/18",
-    date >= as.Date("2018-07-01") & date < as.Date("2019-07-01") ~ "2018/19",
-    date >= as.Date("2019-07-01") & date < as.Date("2020-07-01") ~ "2019/20",
-    date >= as.Date("2020-07-01") & date < as.Date("2021-07-01") ~ "2020/21",
-    date >= as.Date("2021-07-01") & date < as.Date("2022-07-01") ~ "2021/22",
-    date >= as.Date("2022-07-01") & date < as.Date("2023-07-01") ~ "2022/23",
-    date >= as.Date("2023-07-01") & date < as.Date("2024-07-01") ~ "2023/24",
-    date >= as.Date("2024-07-01") & date < as.Date("2025-07-01") ~ "2024/25",
-    date >= as.Date("2025-07-01") & date < as.Date("2026-07-01") ~ "2025/26",
-    TRUE ~ NA
-  ))
+  dplyr::mutate(season = flu_season(date))
+
 gr_case_dat <- gr_case_dat %>% group_by(season) %>% mutate(days_from_start = date - min(date))
 gr_case_dat <- gr_case_dat %>% drop_na()
 gr_case_dat %>% group_by(season) %>% filter(y == max(y)) %>% pull(y) %>% hist()
 gr_case_dat %>% group_by(season) %>% filter(y == max(y)) %>% pull(days_from_start) %>% as.numeric() %>% hist()
 
 
-p_gr_cases_all <- ggplot(data=gr_case_dat %>% filter(!(season %in% c("2020/21","2021/22")))) + 
+p_gr_cases_all <- ggplot(data=gr_case_dat %>% filter(!(season %in% c("2019/20","2020/21","2021/22")))) + 
   geom_hline(yintercept=0,linetype="dashed") +
   geom_ribbon(aes(x=date,ymin=lb_50,ymax=ub_50,group=season),alpha=0.25,fill="blue") +
   geom_ribbon(aes(x=date,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
@@ -919,43 +921,189 @@ p_gr_cases_all <- ggplot(data=gr_case_dat %>% filter(!(season %in% c("2020/21","
   #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
   xlab("Date (by week)") + ylab('Growth rate (per week)') +
   scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,by=0.2)) +
+  coord_cartesian(ylim=c(-1.1,1.1)) +
   scale_x_date(date_labels = "%Y-%m", date_breaks = "1 year")+
   theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
 
+## Align by day of year
+gr_case_dat$day_of_year <- yday(gr_case_dat$date)
+gr_case_dat <- gr_case_dat %>% group_by(season) %>%
+  mutate(day_of_year = if_else(day_of_year < 183, day_of_year + 365, day_of_year)) %>%
+  ungroup()
+
+## Create labels for plot, label seasons by pre-pandemic, during pandemic (2020 and 2021), post pandemic (2022-2024) and current season (2025/26)
+gr_case_dat <- gr_case_dat %>%
+  mutate(plot_label = case_when(
+    season %in% c("2012/13","2013/14","2014/15","2015/16","2016/17","2017/18","2018/19") ~ "Pre-pandemic",
+    season %in% c("2019/20","2020/21","2021/22") ~ "During pandemic",
+    season %in% c("2022/23","2023/24","2024/25") ~ "Post-pandemic",
+    season == "2025/26" ~ "Current season",
+    TRUE ~ "Pre-pandemic"
+  ))
+
+
+breaks <- seq(150,max_t,by=50)
+labels <- if_else(breaks > 365, breaks - 365, breaks)
+
+p_gr_case_by_day<- ggplot(data=gr_case_dat %>% filter(plot_label != "During pandemic")) + 
+  geom_hline(yintercept=0,linetype="dashed") +
+  geom_vline(xintercept=365,linetype="dashed") +
+  geom_ribbon(aes(x=day_of_year,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
+  # geom_ribbon(aes(x=day_of_year,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
+  geom_line(aes(x=day_of_year,y=y,group=season,col=plot_label),size=0.75) +
+  #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
+  xlab("Day of year (start of Epi week)") + ylab('Growth rate (per week)') +
+  #scale_color_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
+  #scale_fill_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
+  scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,by=0.2)) +
+  scale_x_continuous(breaks=breaks,labels=labels) +
+  
+  coord_cartesian(ylim=c(-1.1,1.1)) +
+  theme_use + 
+  theme(legend.position="bottom",legend.direction="horizontal")
+
+
+
+## Align by peak data
+## Filter gr_flunet_dat to be between September and May each season
+gr_case_dat1 <- gr_case_dat %>%
+  filter(month(date) >= 9 | month(date) <= 4 | (month(date) == 5 & day(date) <= 1)) %>%
+  group_by(season) %>%
+  slice_max(y, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+max_gr <- gr_case_dat1 %>% group_by(season) %>% filter(y == max(y))# %>% select(season, day_of_year) %>% rename(peak_time = day_of_year)
+
+max_gr %>% select(season, Year, Week, date, y, lb_95, ub_95) %>% arrange(season) %>% tail(5) %>% print()
+
+
+gr_case_dat <- gr_case_dat %>% left_join(max_gr %>% select(season, day_of_year) %>% rename(peak_time = day_of_year))
+gr_case_dat$day_shifted <- gr_case_dat$day_of_year - gr_case_dat$peak_time
+
+## Get max growth rate and week of max growth rate
+## Merge in raw data
+gr_case_dat <-gr_case_dat %>% left_join(case_counts %>% mutate(gr = log((total+0.1)/lag(total+0.1,1)), gr_smooth = zoo::rollmean(gr, 4, fill=NA,align="right"))) 
+
+peak_2025_26 <- gr_case_dat %>%
+  filter(season == "2025/26", day_shifted >= -100, day_shifted <= 100) %>%
+  summarise(max_y = max(y, na.rm = TRUE)) %>%
+  pull(max_y)
+
+label_dat <- gr_case_dat %>%
+  filter(day_shifted >= -100, day_shifted <= 100, plot_label != "During pandemic", season != "2019/20") %>%
+  group_by(season) %>%
+  filter(y == max(y, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(y >= peak_2025_26)  # only keep peaks higher than 2025/26
+label_dat_all <- label_dat
+p_gr_case_by_peak1 <- ggplot(data=gr_case_dat %>% filter(day_shifted <= 100, day_shifted >= -100,plot_label!="During pandemic")) + 
+  geom_hline(yintercept=0,linetype="dashed") +
+  geom_ribbon(aes(x=day_shifted,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
+  # geom_ribbon(aes(x=day_of_year,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
+  geom_line(aes(x=day_shifted,y=y,group=season,col=plot_label),size=0.75) +
+  scale_y_continuous(limits=c(-1.1,1.1),breaks=seq(-1,1,by=0.2)) +
+  coord_cartesian(ylim=c(-1,1)) +
+  #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
+  xlab("Day relative to peak") + ylab('Growth rate (per week)') +
+  scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00"))+
+  scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00"))+
+  #scale_color_viridis_d("Time period") +
+  #scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  theme_use + 
+  theme(legend.position="bottom",legend.direction="horizontal")
+p_gr_case_by_peak <- p_gr_case_by_peak1 +
+  geom_label_repel(
+    data = label_dat,
+    aes(
+      x = day_shifted,
+      y = y,
+      label = season
+    ),
+    size = 3,
+    min.segment.length = 0,
+    box.padding = 0.6,
+    point.padding = 0,
+    show.legend = FALSE,
+    nudge_x=10,
+    nudge_y=0.08,
+    direction="both"
+  )
+
+p_gr_case_by_peak
+
+p_gr_cases_allb <- p_gr_cases_all
 p_gr_cases_all <- add_doubling_axis(p_gr_cases_all)
+p_gr_case_all_by_dayb <- p_gr_case_all_by_day
+p_gr_case_all_by_day <- add_doubling_axis(p_gr_case_by_day)
+p_gr_case_all_by_peakb <- p_gr_case_all_by_peak
+p_gr_case_all_by_peak1b <- p_gr_case_by_peak1
+p_gr_case_all_by_peak <- add_doubling_axis(p_gr_case_by_peak)
+
 ggsave("figures/growth_rates/ukhsa_all_flu_growth_rate.png",p_gr_cases_all,width=7,height=4)
+ggsave("figures/growth_rates/ukhsa_all_flu_growth_rate_by_day.png",p_gr_case_all_by_day,width=7,height=4)
+ggsave("figures/growth_rates/ukhsa_all_flu_growth_rate_by_peak.png",p_gr_case_all_by_peak,width=7,height=4)
 write_csv(gr_case_dat,"results/ukhsa_all_flu_growth_rates.csv")
 
+## Pull out peak growth rates
+gr_case_dat %>% group_by(season) %>% filter(y == max(y)) %>% arrange(-y)
+
+gr_case_dat1 <- gr_case_dat %>% group_by(season) %>% mutate(total_rel = total/sum(total))
+
+gr_peaks_all <- gr_case_dat1 %>% group_by(season) %>% filter(y == max(y)) %>% arrange(-y) %>%
+  select(y,lb_95,ub_95,Year,Week,date,season,plot_label,total_rel) %>%
+  mutate(Estimate = paste0(signif(y,3), " (", signif(lb_95,3),"-",signif(ub_95,3),")")) %>% 
+  select(season,Week, Estimate,plot_label,total_rel) %>%
+  rename(Season=season,`Time period`=plot_label, `Week of peak growth`=Week,`Peak growth rate of all influenza cases`=Estimate,
+         `Cumulative incidence (% of all influenza cases)`=total_rel)
 
 #############################################
 ## FIFTH H3 flu cases from England case data
 #############################################
-case_counts <- read_csv("data/ukhsa/case_counts_england_2009_2025.csv")
-case_counts$date <- lubridate::dmy(case_counts$Date)
+#case_counts <- read_csv("data/ukhsa/case_counts_england_2009_2025.csv")
+case_counts <- read_csv("data/final/england_h3_cases_historic_manual.csv")
+case_counts$date <- lubridate::dmy(case_counts$date)
+## Start from the 2011/12 season to miss the H1N1 pandemic
+case_counts <- case_counts %>% filter(date >= as.Date("2011-07-01"))
+
+## Drop most recent week
+case_counts <- case_counts[-nrow(case_counts),]
+
 case_counts <- case_counts %>%
   mutate(total_tested = `Influenza A H1N1pdm09` + `Influenza A H3N2` + `Influenza B`,
          inferred_H3 = `Influenza A not subtyped` * `Influenza A H3N2`/total_tested,
          inferred_H3 = if_else(is.na(inferred_H3),0,inferred_H3),
          inferred_H3 = inferred_H3 + `Influenza A H3N2`)
 
-case_counts <- case_counts %>% mutate(Week=`Week number`,Year = year(date))
+case_counts <- case_counts %>% mutate(Week=`Week`,Year = year(date))
+case_counts1 <- case_counts
+case_counts1$inferred_H3 <- round(case_counts1$inferred_H3)
+case_counts1$date <- as.numeric(as.factor(case_counts1$date))
 mod <- construct_model(
-  #method = random_walk(),
-  method=p_spline(spline_degree = 3, days_per_knot = 3),
+  method = random_walk(),
+  #method=p_spline(spline_degree = 3, days_per_knot = 3),
   pathogen_structure =single(
-    case_timeseries = round((case_counts$inferred_H3)),           # timeseries of case data
-    time = as.numeric(as.factor(case_counts$date)),                       # date or time variable labels
-    pathogen_name = 'Influenza H3'                # optional name of pathogen
+    data=case_counts1,
+    case_timeseries="inferred_H3",
+    time="date"
+    #case_timeseries = round((case_counts$inferred_H3)),           # timeseries of case data
+    #time = as.numeric(as.factor(case_counts$date))                       # date or time variable labels
+
+  ),
+  smoothing_params = smoothing_structure(   # independent smoothing structure 
+    tau_mean = c(0),           # parameter - one for each pathogen
+    tau_sd = c(1)
   ),
   dow_effect = FALSE
 )
 
 fit <- fit_model(
   mod,
-  iter = 2000,
-  warmup = 1000,
-  chains = 3
+  n_iter = 2000,
+  n_warmup = 1000,
+  n_chain = 3
 )
 
 gr <- growth_rate(fit)
@@ -966,52 +1114,250 @@ time_key_cases <- case_counts %>% select(Year, Week, date) %>%
   mutate(time = as.numeric(as.factor(date)))
 gr_case_dat <- gr_case_dat %>% left_join(time_key_cases)
 
-## For later years, just assign season manually
+## Convert dates to flu season
 gr_case_dat <- gr_case_dat %>%
-  mutate(season = case_when(
-    date >= as.Date("2011-07-01") & date < as.Date("2012-07-01") ~ "2011/12",
-    date >= as.Date("2012-07-01") & date < as.Date("2013-07-01") ~ "2012/13",
-    date >= as.Date("2013-07-01") & date < as.Date("2014-07-01") ~ "2013/14",
-    date >= as.Date("2014-07-01") & date < as.Date("2015-07-01") ~ "2014/15",
-    date >= as.Date("2015-07-01") & date < as.Date("2016-07-01") ~ "2015/16",
-    date >= as.Date("2016-07-01") & date < as.Date("2017-07-01") ~ "2016/17",
-    date >= as.Date("2017-07-01") & date < as.Date("2018-07-01") ~ "2017/18",
-    date >= as.Date("2018-07-01") & date < as.Date("2019-07-01") ~ "2018/19",
-    date >= as.Date("2019-07-01") & date < as.Date("2020-07-01") ~ "2019/20",
-    date >= as.Date("2020-07-01") & date < as.Date("2021-07-01") ~ "2020/21",
-    date >= as.Date("2021-07-01") & date < as.Date("2022-07-01") ~ "2021/22",
-    date >= as.Date("2022-07-01") & date < as.Date("2023-07-01") ~ "2022/23",
-    date >= as.Date("2023-07-01") & date < as.Date("2024-07-01") ~ "2023/24",
-    date >= as.Date("2024-07-01") & date < as.Date("2025-07-01") ~ "2024/25",
-    date >= as.Date("2025-07-01") & date < as.Date("2026-07-01") ~ "2025/26",
-    TRUE ~ NA
-  ))
+  dplyr::mutate(season = flu_season(date))
 gr_case_dat <- gr_case_dat %>% group_by(season) %>% mutate(days_from_start = date - min(date))
 gr_case_dat <- gr_case_dat %>% drop_na()
 gr_case_dat %>% group_by(season) %>% filter(y == max(y)) %>% pull(y) %>% hist()
 gr_case_dat %>% group_by(season) %>% filter(y == max(y)) %>% pull(days_from_start) %>% as.numeric() %>% hist()
 
 
-p_gr_cases <- ggplot(data=gr_case_dat %>% filter(!(season %in% c("2020/21","2021/22")))) + 
+p_gr_cases <- ggplot(data=gr_case_dat %>% filter(!(season %in% c("2019/20","2020/21","2021/22")))) + 
   geom_hline(yintercept=0,linetype="dashed") +
   geom_ribbon(aes(x=date,ymin=lb_50,ymax=ub_50,group=season),alpha=0.25,fill="blue") +
   geom_ribbon(aes(x=date,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
   geom_line(aes(x=date,y=y,group=season),col="black") +
   #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
   xlab("Date (by week)") + ylab('Growth rate (per week)') +
+  coord_cartesian(ylim=c(-1.1,1.1)) +
  # scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,by=0.2)) +
   scale_x_date(date_labels = "%Y-%m", date_breaks = "1 year")+
   theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
+## Align by day of year
+gr_case_dat$day_of_year <- yday(gr_case_dat$date)
+gr_case_dat <- gr_case_dat %>% group_by(season) %>%
+  mutate(day_of_year = if_else(day_of_year < 183, day_of_year + 365, day_of_year)) %>%
+  ungroup()
 
-#p_gr_cases <- add_doubling_axis(p_gr_cases)
-ggsave("figures/growth_rates/ukhsa_h3_flu_growth_rate.png",p_gr_cases,width=7,height=4)
+## Create labels for plot, label seasons by pre-pandemic, during pandemic (2020 and 2021), post pandemic (2022-2024) and current season (2025/26)
+gr_case_dat <- gr_case_dat %>%
+  mutate(plot_label = case_when(
+    season %in% c("2012/13","2013/14","2014/15","2015/16","2016/17","2017/18","2018/19") ~ "Pre-pandemic",
+    season %in% c("2019/20","2020/21","2021/22") ~ "During pandemic",
+    season %in% c("2022/23","2023/24","2024/25") ~ "Post-pandemic",
+    season == "2025/26" ~ "Current season",
+    TRUE ~ "Pre-pandemic"
+  ))
+
+max_t <- max(gr_case_dat %>% select(season, day_of_year) %>% distinct() %>% pull(day_of_year))
+min_t <- min(gr_case_dat %>% select(season, day_of_year) %>% distinct() %>% pull(day_of_year))
+
+breaks <- seq(150,max_t,by=50)
+labels <- if_else(breaks > 365, breaks - 365, breaks)
+
+p_gr_case_by_day<- ggplot(data=gr_case_dat %>% filter(plot_label != "During pandemic")) + 
+  geom_vline(xintercept=365,linetype="dashed") +
+  geom_hline(yintercept=0,linetype="dashed") +
+  geom_ribbon(aes(x=day_of_year,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
+  # geom_ribbon(aes(x=day_of_year,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
+  geom_line(aes(x=day_of_year,y=y,group=season,col=plot_label),size=0.75) +
+  #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
+  xlab("Day of year (start of Epi week)") + ylab('Growth rate (per week)') +
+  #scale_color_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
+  #scale_fill_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
+  scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,by=0.2)) +
+  scale_x_continuous(breaks=breaks,labels=labels) +
+  coord_cartesian(ylim=c(-1.1,1.1)) +
+  
+  theme_use + 
+  theme(legend.position="bottom",legend.direction="horizontal")
+
+
+
+## Align by peak data
+## Filter gr_flunet_dat to be between September and May each season
+gr_case_dat1 <- gr_case_dat %>%
+  filter(month(date) >= 9 | month(date) <= 4 | (month(date) == 5 & day(date) <= 1)) %>%
+  group_by(season) %>%
+  slice_max(y, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+max_gr <- gr_case_dat1 %>% group_by(season) %>% filter(y == max(y))# %>% select(season, day_of_year) %>% rename(peak_time = day_of_year)
+
+max_gr %>% select(season, Year, Week, date, y, lb_95, ub_95) %>% arrange(season) %>% tail(5) %>% print()
+
+
+gr_case_dat <- gr_case_dat %>% left_join(max_gr %>% select(season, day_of_year) %>% rename(peak_time = day_of_year))
+gr_case_dat$day_shifted <- gr_case_dat$day_of_year - gr_case_dat$peak_time
+
+## Get max growth rate and week of max growth rate
+## Merge in raw data
+gr_case_dat <-gr_case_dat %>% left_join(case_counts %>% mutate(gr = log((inferred_H3+0.1)/lag(inferred_H3+0.1,1)), gr_smooth = zoo::rollmean(gr, 4, fill=NA,align="right"))) 
+
+## Add labels for the seasons with peak growth rates over 0.6
+peak_2025_26 <- gr_case_dat %>%
+  filter(season == "2025/26", day_shifted >= -100, day_shifted <= 100) %>%
+  summarise(max_y = max(y, na.rm = TRUE)) %>%
+  pull(max_y)
+peak_2025_26 <- 0.6
+label_dat <- gr_case_dat %>%
+  filter(day_shifted >= -100, day_shifted <= 100, plot_label != "During pandemic", season != "2019/20") %>%
+  group_by(season) %>%
+  filter(y == max(y, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(y >= peak_2025_26)  # only keep peaks higher than 2025/26
+
+
+p_gr_case_by_peak1 <- ggplot(data=gr_case_dat %>% filter(day_shifted <= 100, day_shifted >= -100,plot_label!="During pandemic" & season != "2019/20")) + 
+  geom_hline(yintercept=0,linetype="dashed") +
+  geom_ribbon(aes(x=day_shifted,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
+  # geom_ribbon(aes(x=day_of_year,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
+  geom_line(aes(x=day_shifted,y=y,group=season,col=plot_label),size=0.75) +
+  scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,by=0.2)) +
+  coord_cartesian(ylim=c(-1.1,1.1)) +
+  
+  #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
+  xlab("Day relative to peak") + ylab('Growth rate (per week)') +
+  #scale_color_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
+  #scale_fill_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
+  scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
+  theme_use + 
+  theme(legend.position="bottom",legend.direction="horizontal")
+
+p_gr_case_by_peak <- p_gr_case_by_peak1 +
+  geom_label_repel(
+    data = label_dat,
+    aes(
+      x = day_shifted,
+      y = y,
+      label = season
+    ),
+    size = 3,
+    min.segment.length = 0,
+    box.padding = 0.6,
+    point.padding = 0,
+    show.legend = FALSE,
+    nudge_x=10,
+    nudge_y=0.08,
+    direction="both"
+  )
+p_gr_cases_h3b <- p_gr_cases_all
+p_gr_cases_h3 <- add_doubling_axis(p_gr_cases_all)
+p_gr_case_h3_by_dayb <- p_gr_case_by_day
+p_gr_case_h3_by_day <- add_doubling_axis(p_gr_case_by_day)
+p_gr_case_h3_by_peakb <- p_gr_case_by_peak
+p_gr_case_h3_by_peak <- add_doubling_axis(p_gr_case_by_peak)
+
+
+gr_h3_dat1 <- gr_case_dat %>% group_by(season) %>% mutate(total_rel = inferred_H3/sum(inferred_H3))
+
+gr_peaks_h3 <- gr_h3_dat1 %>% group_by(season) %>% filter(y == max(y)) %>% arrange(-y) %>%
+  select(y,lb_95,ub_95,Year,Week,date,season,plot_label,total_rel) %>%
+  mutate(Estimate = paste0(signif(y,3), " (", signif(lb_95,3),"-",signif(ub_95,3),")")) %>% 
+  select(season,Week, Estimate,plot_label,total_rel) %>%
+  rename(Season=season,`Time period`=plot_label, `Week of peak A/H3N2 growth` =Week, `Peak growth rate of A/H3N2 cases`=Estimate,`Cumulative incidence (% of total A/H3N2 cases)`=total_rel)
+
+peak_grs_comb <- left_join(gr_peaks_h3,gr_peaks_all) %>% filter(`Time period` != "During pandemic") %>% arrange(`Peak growth rate of all influenza cases`)
+
+
+dominant_dat <- gr_case_dat %>% group_by(season) %>% 
+  summarize(total_h3 = sum(`Influenza A H3N2`),total_h1 = sum(`Influenza A H1N1pdm09`),total_b = sum(`Influenza B`)) %>% pivot_longer(-season) %>% group_by(season) %>% filter(value == max(value))
+
+dominant_key <- c("total_h3"="A/H3N2","total_h1"="A/H1N1pdm09","total_b"="Influenza B")
+dominant_dat$Dominant <- dominant_key[dominant_dat$name]
+
+peak_grs_comb <- peak_grs_comb %>% left_join(dominant_dat %>% select(season,Dominant) %>% rename(Season=season))
+
+ggsave("figures/growth_rates/ukhsa_h3_flu_growth_rate.png",p_gr_cases_h3,width=7,height=4)
+ggsave("figures/growth_rates/ukhsa_h3_flu_growth_rate_by_day.png",p_gr_case_h3_by_day,width=7,height=4)
+ggsave("figures/growth_rates/ukhsa_h3_flu_growth_rate_by_peak.png",p_gr_case_h3_by_peak,width=7,height=4)
+
 write_csv(gr_case_dat,"results/ukhsa_h3_flu_growth_rates.csv")
+write_csv(peak_grs_comb,"results/ukhsa_peak_growth_rates.csv")
+p1 <- p_gr_case_h3_by_peak + coord_cartesian(ylim=c(-1,1)) + theme(axis.title.x = element_blank(), axis.title.y=element_blank()) + ggtitle("A/H3N2 cases aligned by peak growth") + labs(tag="B")
+p2 <- p_gr_case_all_by_peak + coord_cartesian(ylim=c(-1,1)) + theme(axis.title.y=element_blank(),axis.title.x=element_text(size=10))+ ggtitle("All influenza cases aligned by peak growth")+ labs(tag="D")
+p3 <- p_gr_case_h3_by_day + coord_cartesian(ylim=c(-1,1))+ theme(axis.title.x = element_blank())+ theme(axis.title.y=element_blank())+ ggtitle("A/H3N2 cases aligned by day of year")+ labs(tag="A")
+p4 <- p_gr_case_all_by_day + coord_cartesian(ylim=c(-1,1)) + theme(axis.title.y=element_blank(),axis.title.x=element_text(size=10))+ ggtitle("All influenza cases aligned by day of year")+ labs(tag="C")
+
+comb_plot <- ((p3 / p4) | (p1 / p2))
+comb_plot <- comb_plot+plot_layout(guides = "collect") & 
+  theme(legend.position = "bottom",legend.text = element_text(size=10),legend.title=element_text(size=10),plot.title=element_text(size=10),plot.tag=element_text(face="bold"))
+
+comb_plot
+ggsave("figures/growth_rates/main_figure.png",comb_plot,width=10,height=7)
+ggsave("figures/growth_rates/main_figure.pdf",comb_plot,width=10,height=7)
+
+
+p_main_all <- p_gr_case_all_by_dayb + labs(tag="") + theme(axis.title=element_text(size=16),axis.text=element_text(size=12),legend.text=element_text(size=12),
+                            legend.title=element_text(size=12),plot.title=element_text(size=16)) +
+  ggtitle("Weekly growth rate of all influenza cases") +
+  xlab("Day of year") +
+  coord_cartesian(ylim=c(-1,1))+
+  geom_label_repel(
+    data = label_dat_all,
+    aes(
+      x = day_of_year,
+      y = y,
+      label = season
+    ),
+    size = 4,
+    min.segment.length = 0,
+    box.padding = 0.6,
+    point.padding = 0,
+    show.legend = FALSE,
+    nudge_x=15,
+    nudge_y=0.08,
+    direction="both"
+  ) +
+  geom_label(data=data.frame(x=366,y=-1.04,label="1st January"),aes(x=x,y=y,label=label))
+ggsave("figures/growth_rates/all_cases_main.pdf",p_main_all,width=10,height=6)
+ggsave("figures/growth_rates/all_cases_main.png",p_main_all,width=10,height=6)
+
+
+p_main_all_shifted <- p_gr_case_all_by_peak1b + labs(tag="") + theme(axis.title=element_text(size=16),axis.text=element_text(size=12),legend.text=element_text(size=12),
+                                                         legend.title=element_text(size=12),plot.title=element_text(size=16)) +
+  ggtitle("Weekly growth rate of all influenza cases aligned to day of peak growth rate") +
+  xlab("Days relative to peak growth rate") +
+  coord_cartesian(ylim=c(-1,1))+
+  geom_label_repel(
+    data = label_dat_all,
+    aes(
+      x = day_shifted,
+      y = y,
+      label = season
+    ),
+    size = 4,
+    min.segment.length = 0,
+    box.padding = 0.6,
+    point.padding = 0,
+    show.legend = FALSE,
+    nudge_x=15,
+    nudge_y=0.08,
+    direction="both"
+  ) 
+
+ggsave("figures/growth_rates/all_cases_main_aligned.pdf",p_main_all_shifted,width=10,height=6)
+ggsave("figures/growth_rates/all_cases_main_aligned.png",p_main_all_shifted,width=10,height=6)
 
 gr_plot_data_comb <- bind_rows(p_gr_flunet$data %>% mutate(Scenario = "A/H3N2, WHO FluNet"),
 p_gr_flunet_all$data %>% mutate(Scenario = "All influenza, WHO FluNet"),
 p_gr_cases$data %>% mutate(Scenario = "A/H3N2, UKHSA"),
 p_gr_cases_all$data %>% mutate(Scenario = "All influenza, UKHSA"))
+
+gr_plot_data_comb %>% filter(!(season %in% c("2020/21","2019/20","2021/22"))) %>% filter(Scenario == "A/H3N2, WHO FluNet") %>% group_by(season) %>% filter(y == max(y)) %>% arrange(-y) %>% head()
+gr_plot_data_comb %>% filter(!(season %in% c("2020/21","2019/20","2021/22"))) %>% filter(Scenario == "A/H3N2, WHO FluNet") %>% group_by(season) %>% filter(y == max(y)) %>% arrange(y) %>% head()
+gr_plot_data_comb %>% filter(!(season %in% c("2020/21","2019/20","2021/22"))) %>% filter(Scenario == "All influenza, WHO FluNet") %>% group_by(season) %>% filter(y == max(y)) %>% arrange(-y) %>% head()
+gr_plot_data_comb %>% filter(!(season %in% c("2020/21","2019/20","2021/22"))) %>% filter(Scenario == "All influenza, WHO FluNet") %>% group_by(season) %>% filter(y == max(y)) %>% arrange(y) %>% head()
+gr_plot_data_comb %>% filter(!(season %in% c("2020/21","2019/20","2021/22"))) %>% filter(Scenario == "A/H3N2, UKHSA") %>% group_by(season) %>% filter(y == max(y)) %>% arrange(-y)%>% head()
+gr_plot_data_comb %>% filter(!(season %in% c("2020/21","2019/20","2021/22"))) %>% filter(Scenario == "A/H3N2, UKHSA") %>% group_by(season) %>% filter(y == max(y)) %>% arrange(y)%>% head()
+gr_plot_data_comb %>% filter(!(season %in% c("2020/21","2019/20","2021/22"))) %>% filter(Scenario == "All influenza, UKHSA") %>% group_by(season) %>% filter(y == max(y)) %>% arrange(-y) %>% head()
+gr_plot_data_comb %>% filter(!(season %in% c("2020/21","2019/20","2021/22"))) %>% filter(Scenario == "All influenza, UKHSA") %>% group_by(season) %>% filter(y == max(y)) %>% arrange(y)%>% head()
+
 
 p_gr_all_comb <- ggplot(data=gr_plot_data_comb %>% filter(!(season %in% c("2020/21","2021/22")))) + 
   ## Add rectange over pandemic
