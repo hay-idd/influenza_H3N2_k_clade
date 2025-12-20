@@ -176,6 +176,14 @@ final_dataset <- left_join(rcgp_subtype, rcgp_flu%>%
                               mutate(age = if_else(age == "<5","0-4",age)) ) %>% rename(group=age) %>% left_join(ili_cases_comb_expanded_grouped %>% mutate(date = date + 1)) %>%
   mutate(Influenza = ILI * flu_prop_smooth) %>%
   mutate(ILI_plus = ILI * flu_prop_smooth * percentage_h3_new) 
+final_dataset_app <- final_dataset %>% 
+  filter(date >= "2022-01-01") %>%
+  filter(date <= "2023-12-31") %>%
+  select(
+  Year, Week, date, group, ILI, ILI_per_100k, N, Influenza, flu_prop, flu_prop_smooth,N, ILI_plus
+) %>%
+  rename(age_group=group,flu_samples=Influenza,prop_flu=flu_prop,smooth_prop=flu_prop_smooth,total_samples=N,ILI_flu=ILI_plus)
+write_csv(final_dataset_app,"new_data/rcgp_ili_flu_by_age_for_app.csv")
 
 ## Recode Influenza and ILI_plus to All influenza cases and A/H3N2 cases
 final_dataset <- final_dataset %>% select(Year,Week, date,group,ILI_per_100k, N, ILI, flu_prop,Influenza,,ILI_plus) %>%
