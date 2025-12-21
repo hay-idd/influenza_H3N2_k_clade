@@ -416,7 +416,7 @@ p_Rt_shifted_2 <- ggplot(Rt_df_shifted, aes(x = days_since_peak, y = Rt_mean, co
 
 p_Rt_shifted_2
 
- ggsave("rt_estimates_plots/pre-Christmas_rt_estimates_by_season_1_shifted_by_peak_incidence.png",p_Rt_shifted_2,height =8 ,width = 10)
+ ggsave("figures/rt_estimates_plot/pre-Christmas_rt_estimates_by_season_1_shifted_by_peak_incidence.png",p_Rt_shifted_2,height =8 ,width = 10)
 
  
  ###version 2 to avoid overlapping labels
@@ -456,5 +456,5 @@ p_Rt_shifted_2
  p_Rt_shifted_2
  
  
- ggsave("rt_estimates_plots/pre-Christmas_rt_estimates_by_season_1_shifted_by_peak_incidence_2.png",p_Rt_shifted_2,height =8 ,width = 10)
+ ggsave("figures/rt_estimates_plot/pre-Christmas_rt_estimates_by_season_1_shifted_by_peak_incidence_2.png",p_Rt_shifted_2,height =8 ,width = 10)
  

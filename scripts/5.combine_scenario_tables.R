@@ -2,7 +2,7 @@
 library(tidyverse)
 
 # === user config ===
-csv_dir   <- "~/Documents/GitHub/influenza_H3N2_k_clade/new_scenarios/"   # top-level folder containing many subfolders
+csv_dir   <- "~/Documents/GitHub/influenza_H3N2_k_clade/scenarios/"   # top-level folder containing many subfolders
 out_table <- "~/Documents/GitHub/influenza_H3N2_k_clade/figures/scenario_table_65_and_total.csv"
 
 # === read subfolders' cumulative_incidence.csv ===

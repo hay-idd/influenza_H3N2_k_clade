@@ -675,8 +675,8 @@ ggsave("figures/figS5.pdf",figSX,width=8,height=8)
 ## FOURTH fit to overall flu cases
 #############################################
 #case_counts <- read_csv("data/ukhsa/case_counts_england_2009_2025.csv")
-case_counts <- read_csv("data/final/england_h3_cases_historic_manual.csv")
-case_counts$date <- lubridate::dmy(case_counts$date)
+case_counts <- read_csv("data/resp_datamart_influenza_cases_england.csv")
+#case_counts$date <- lubridate::dmy(case_counts$date)
 ## Start from the 2011/12 season to miss the H1N1 pandemic
 case_counts <- case_counts %>% filter(date >= as.Date("2011-07-01"))
 ## Drop last row
@@ -882,8 +882,8 @@ gr_peaks_all <- gr_case_dat1 %>% group_by(season) %>% filter(y == max(y)) %>% ar
 ## FIFTH H3 flu cases from England case data
 #############################################
 #case_counts <- read_csv("data/ukhsa/case_counts_england_2009_2025.csv")
-case_counts <- read_csv("data/final/england_h3_cases_historic_manual.csv")
-case_counts$date <- lubridate::dmy(case_counts$date)
+case_counts <- read_csv("data/resp_datamart_influenza_cases_england.csv")
+#case_counts$date <- lubridate::dmy(case_counts$date)
 ## Start from the 2011/12 season to miss the H1N1 pandemic
 case_counts <- case_counts %>% filter(date >= as.Date("2011-07-01"))
 

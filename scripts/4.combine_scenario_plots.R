@@ -3,7 +3,7 @@ library(tidyverse)
 library(ggplot2)
 
 # ---- CONFIG ----
-plots_dir <- "~/Documents/GitHub/influenza_H3N2_k_clade/new_scenarios//" # each subfolder must contain one .RData with 'res' (and optionally 'plot_obj'/'plot_data')
+plots_dir <- "~/Documents/GitHub/influenza_H3N2_k_clade/scenarios//" # each subfolder must contain one .RData with 'res' (and optionally 'plot_obj'/'plot_data')
 out_png   <- "combined_facet_plot.png"
 out_pdf   <- "combined_facet_plot.pdf"
 save_wd <- "~/Documents/GitHub/influenza_H3N2_k_clade/figures/"

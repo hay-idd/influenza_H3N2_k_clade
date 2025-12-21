@@ -338,25 +338,6 @@ results_tbl_young_escape_long <- results_tbl_young_escape %>% mutate(Scenario = 
   pivot_longer(-c(variable,Scenario))
 
 
-## Read in estimated growth rates from RCGP and WHO FluNet
-gr_flunet <- read_csv("../results/flunet_h3_growth_rates.csv") %>% filter(season=='2025/26') %>%
-  mutate(month = month(date)) %>% filter(month %in% c(11)) %>% group_by(month) %>% filter(date == min(date)) %>%
-  select(y,lb_95,ub_95) %>% mutate(Dataset="WHO FluNet") %>%
-  
-  mutate(Label="WHO FluNet") %>%
-  mutate(name = "Peak growth rate")
-
-rcgp_dat <- read_csv("../results/RCGP_growth_rates_by_age.csv") %>% filter(agegroup=="All",Season=='2025 to 2026') %>%
-  mutate(month = month(date)) %>% filter(month %in% c(11)) %>% group_by(month) %>% filter(date == min(date)) %>%
-  select(y,lb_95,ub_95) %>% mutate(Dataset="RCGP") %>% 
-  mutate(Label="RCGP") %>%
-  mutate(name = "Peak growth rate")
-
-
-gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)
-gr_est_dat$x <- c(3,3.5)
-
-
 ylims <- tibble(
   name = c(
     "Final size",
@@ -378,23 +359,15 @@ p_r0 <- ggplot(results_tbl_R0_long) +
   ) +
   geom_vline(xintercept=1.9, linetype="dashed", color="grey") +
   geom_line(aes(x=variable, y=value, color=name),linewidth=0.75) +
-  #geom_hline(data=gr_est_dat,aes(yintercept=y,linetype=Dataset)) +
-  #geom_pointrange(data=gr_est_dat,aes(y=y,ymin=lb_95,ymax=ub_95,group=Dataset,x=x,col=Label),linewidth=0.5,size=0.25) +
-  #geom_text(data=gr_est_dat,aes(y=y + 0.04,label=Label,x=x2),size=3,hjust=0) +
   facet_wrap(~name,scales="free_y",nrow=1) +
   xlab("R0") +
   ylab("Value") +
   scale_color_brewer("Metric", palette="Set2") +
-  #scale_linetype_manual(values=c("WHO FluNet"="dashed","RCGP"="dotted")) +
   theme_bw() +
   scale_y_continuous(expand=c(0,0)) +
   theme(legend.position="bottom")
 p_r0
 
-gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)
-gr_est_dat$x <- c(0.7,0.8)
-
-#gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)%>% mutate(x1=if_else(Dataset=="WHO FluNet",0.7,0.8)) %>% mutate(x2 = if_else(Dataset=="WHO FluNet",.05,.05))
 
 ylims <- tibble(
   name = c(
@@ -434,9 +407,6 @@ p_escape <- ggplot(results_tbl_escape_long) +
 p_escape
 
 
-gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)
-gr_est_dat$x <- c(0.7,0.8)
-#gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)%>% mutate(x1=if_else(Dataset=="WHO FluNet",0.7,0.8)) %>% mutate(x2 = if_else(Dataset=="WHO FluNet",.05,.05))
 ylims <- tibble(
   name = c(
     "Final size",
@@ -475,12 +445,6 @@ p_escape_young <- ggplot(results_tbl_young_escape_long) +
   theme(legend.position="bottom")
 p_escape_young
 
-
-gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)
-gr_est_dat$x <- c(as.Date("2022-10-01"),as.Date("2022-10-15"))
-#gr_est_dat <- bind_rows(gr_flunet, rcgp_dat)%>% 
-#  mutate(x1=if_else(Dataset=="WHO FluNet",as.Date("2022-10-01"),as.Date("2022-10-15"))) %>%
-#  mutate(x2 = if_else(Dataset=="WHO FluNet",as.Date("2022-08-01"),as.Date("2022-08-01")))
 
 ylims <- tibble(
   name = c(
