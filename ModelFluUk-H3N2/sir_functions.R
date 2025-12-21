@@ -95,7 +95,7 @@ general_sir_explicit <- function(t,y, pars, C, Nage,Nimmunity){
 #' @seealso \code{\link{epi_final_size}}
 #' @export
 epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,
-                                ts=seq(1,365,by=1),
+                                ts=seq(1,365,by=0.1),
                                 age_seeds=c(1),immunity_seed=1,seed_size=1,
                                 ver="fast",return_peak=FALSE,return_compartments=FALSE){
   C <- C1
@@ -175,6 +175,8 @@ epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,
   } else {
     y <- ode(y=start,t=ts,func=general_sir_explicit, parms=c(beta,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity)
   }
+  
+  
   ## Pull out the solved model.
   #rt_ts <- compute_Rt_series(y, pars = c(beta,alphas,Tg), C = C_list, Nage = Nage, Nimmunity = Nimmunity)
 
@@ -196,6 +198,16 @@ epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,
       colnames(y) <- expand_grid(age=1:Nage,immunity=1:Nimmunity,compartment=c("S","I","R","inc")) %>% 
         mutate(name = paste0(compartment,"_",age,"_",immunity)) %>% pull(name)
       y$time <- ts
+      y <- y %>%
+        mutate(time_int = floor(time)) %>%
+        group_by(time_int) %>%
+        summarise(
+          across(starts_with("inc"), first),
+          across(-c(starts_with("inc"), time), first),
+          .groups = "drop"
+        ) %>%
+        rename(time = time_int)
+
       #y <- left_join(y, rt_ts)
       return(y)
     }

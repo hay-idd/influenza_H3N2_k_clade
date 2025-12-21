@@ -305,7 +305,7 @@ server <- function(input, output, session) {
     
     start_day <- as.numeric(start_date)
     end_day_num <- as.numeric(end_date)
-    ts <- seq(start_day, end_day_num, by = 1) - start_day + 1
+    ts <- seq(start_day, end_day_num, by = 0.1) - start_day + 1
     
     # contact matrices
     cm <- build_contact_matrices(input)
@@ -534,7 +534,6 @@ server <- function(input, output, session) {
         pivot_longer(-t, names_to = "age_col", values_to = "weekly_reported") %>%
         mutate(date = res$date_key$date[t]) %>%
         select(date, t, age_col, weekly_reported)
-      
       # compute growth rates (same logic as build_growth_plot)
       age_group_key <- c("inc_1_1"="[0,5)","inc_2_1"="[5,18)","inc_3_1"="[18,65)","inc_4_1"="65+")
       growth_df <- inc_long %>%
@@ -545,6 +544,16 @@ server <- function(input, output, session) {
                log_growth = log((weekly_reported + 1) / (coalesce(lag_weekly, 0) + 1))) %>%
         ungroup() %>%
         select(date, age_col, age_group, t, weekly_reported, lag_weekly, log_growth)
+      ## Compute growth rates overall
+      growth_df_all <- inc_long %>% group_by(date,t) %>% 
+        summarize(weekly_reported=sum(weekly_reported)) %>%
+        mutate(lag_weekly = lag(weekly_reported),
+               log_growth = log((weekly_reported + 1) / (coalesce(lag_weekly, 0) + 1))) %>%
+        ungroup() %>%
+        mutate(age_group = "All") %>%
+        mutate(age_col="All") %>%
+        select(date, age_col, age_group, t, weekly_reported, lag_weekly, log_growth)
+      growth_df <- bind_rows(growth_df, growth_df_all)
       
       # filenames to appear at top level of zip
       png_name   <- "model_combined_plot.png"

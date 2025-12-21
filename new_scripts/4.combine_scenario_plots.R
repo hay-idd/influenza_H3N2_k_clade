@@ -51,7 +51,7 @@ for (fld in folders) {
            date = res$date_key$date[t],
            Scenario = scen)
   
-  all_inc[[scen]] <- inc_long
+   all_inc[[scen]] <- inc_long
   
   # build rectangle shading for that scenario using res$meta dates
   meta <- res$meta
@@ -235,6 +235,18 @@ for (fld in folders) {
   df <- p2$data
   scen <- basename(fld)
   df <- df %>% mutate(Scenario = scen)
+  
+  ## Add in overall growth rate
+  overall_df <- df %>% 
+    select(t,date, Scenario, incidence, lag_inc) %>%
+    group_by(t,date,Scenario) %>%
+    summarize(incidence = sum(incidence, na.rm=TRUE),
+              lag_inc = sum(lag_inc,na.rm=TRUE)) %>%
+    mutate(log_growth = log((incidence + 1) / (coalesce(lag_inc, 0) + 1))) %>%
+    mutate(age_group="All") %>%
+    ungroup()
+  df <- bind_rows(df, overall_df)
+  
   all_p2_data[[scen]] <- df
 }
 if (length(all_p2_data)) {
@@ -247,17 +259,18 @@ if (length(all_p2_data)) {
   combined_p2 <- tibble()
 }
 
+
 ggplot(combined_p2) + geom_line(aes(x=t,y=log_growth,col=age_group)) + facet_wrap(~Scenario)
 
 # ensure age_group factor ordering (shared)
-age_levels <- c("[0,5)","[5,18)","[18,65)","65+")
+age_levels <- c("[0,5)","[5,18)","[18,65)","65+","All")
 combined_inc$age_group <- factor(combined_inc$age_group, levels = age_levels)
 
 # ---- align/annotate combined_p2 with combined_inc (dates), factor levels and scenario labels ----
 # ensure t -> date mapping (use combined_inc as the canonical map of Scenario + t -> date)
 
 # ensure age_group factor ordering (shared with combined_inc)
-age_levels <- c("[0,5)","[5,18)","[18,65)","65+")
+age_levels <- c("[0,5)","[5,18)","[18,65)","65+","All")
 if ("age_group" %in% names(combined_p2)) combined_p2$age_group <- factor(combined_p2$age_group, levels = age_levels)
 
 # apply scenario label mapping (fall back to original if no mapping)
@@ -305,8 +318,15 @@ ggsave(paste0(save_wd,out_png), p_from_p2, width = 9, height = 11, dpi = 300)
 ggsave(paste0(save_wd,out_pdf), p_from_p2, width = 9, height = 11, dpi = 300)
 
 
-
-
+## Find peak overall growth rate with following conditions:
+## 1. Must be after at least 1% of cumulative cases
+annots_gr <- combined_p2 %>% filter(age_group =="All") %>% group_by(Scenario) %>%
+  mutate(cumuinc = cumsum(incidence)) %>%
+  filter(cumuinc >= 0.01 * max(cumuinc,na.rm=TRUE)) %>%
+  filter(log_growth == max(log_growth)) %>%
+  select(Scenario, date,log_growth) %>%
+  rename(`Peak growth rate` = log_growth,
+         `Date of peak growth rate`=date)
 
 # --- Clean all quotes from Scenario & label ---
 annots_clean <- annots_df %>%
@@ -348,6 +368,8 @@ base_vals <- parsed_annots[base_idx,
                            c("peak_reported","cumulative_symptomatic","peak_symptomatic_est")] %>%
   unlist()
 
+parsed_annots <- parsed_annots %>% left_join(annots_gr, by = "Scenario")
+
 # --- Create ratio table (retain peak_date) ---
 ratio_table <- parsed_annots %>%
   mutate(
@@ -355,10 +377,13 @@ ratio_table <- parsed_annots %>%
     ratio_cumulative_symptomatic = cumulative_symptomatic / base_vals["cumulative_symptomatic"],
     ratio_peak_symptomatic_est   = peak_symptomatic_est / base_vals["peak_symptomatic_est"]
   ) %>%
-  select(Scenario, peak_date,
+  select(Scenario, 
+         peak_date,
+         `Date of peak growth rate`,
          ratio_peak_reported,
          ratio_cumulative_symptomatic,
-         ratio_peak_symptomatic_est)
+         ratio_peak_symptomatic_est,
+         `Peak growth rate`)
 
 # --- Print output ---
 parsed_annots

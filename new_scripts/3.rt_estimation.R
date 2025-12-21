@@ -332,8 +332,8 @@ pl
 
 ggsave("new_figures/Fig3.png",p_Rt,height =12 ,width = 8)
 ggsave("new_figures/Fig3.pdf",p_Rt,height =12 ,width = 8)
-ggsave("new_figures/figS7.png",p_incidence,height =12 ,width = 8)
-ggsave("new_figures/figS7.pdf",p_incidence,height =12 ,width = 8)
+ggsave("new_figures/figS7.png",p_incidence + theme(legend.position="bottom"),height =10 ,width = 7)
+ggsave("new_figures/figS7.pdf",p_incidence+ theme(legend.position="bottom"),height =10 ,width = 7)
 
 #ggsave("new_figures/Fig3.png",pl,height =12 ,width = 12)
 #ggsave("new_figures/Fig3.pdf",pl,height =12 ,width = 12)

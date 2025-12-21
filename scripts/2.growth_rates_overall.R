@@ -31,7 +31,7 @@ options(mc.cores = 4)
 overall_ILIplus <- read_csv("data/final/ili_plus_datasets_by_age.csv")
 overall_ILIplus <- overall_ILIplus %>% select(Year,Week,date,group,ILIplus,Influenza_cases,Season)
 overall_ILIplus <- overall_ILIplus %>% bind_rows(overall_ILIplus %>% group_by(Year,Week,date,Season) %>% summarize(ILIplus = sum(ILIplus),Influenza_cases=sum(Influenza_cases)) %>% mutate(group="All"))
-overall_ILIplus$group <- factor(overall_ILIplus$group, levels=c("All","1-4","5-14","15-44","45-64","65+"))
+overall_ILIplus$group <- factor(overall_ILIplus$group, levels=c("All","0-4","5-14","15-44","45-64","65+"))
 overall_ILIplus <- overall_ILIplus %>% 
   select(Season,Year,Week,date,group,ILIplus,Influenza_cases) %>% 
   mutate("Source"="RCGP") %>%
@@ -221,7 +221,7 @@ p_inc_h3_age <- plot_incidence(overall_ILIplus,x="date",y="cases_H3",color="grou
 p_inc_all_age <- plot_incidence(overall_ILIplus,x="date",y="cases_total",color="group",point=FALSE)+ 
   scale_color_brewer("Age group",palette = "Set2") + xlab("Date (end of Epi week)") +
   ylab("Weekly cases of confirmed or suspected A/H3N2") + theme_use
-
+break
 ## Save all plots
 p_h3_gr_all
 p_h3_gr_recent_compare
@@ -333,14 +333,14 @@ time_key <- overall_ILIplus %>% select(Year, Week, date,Season) %>%
   mutate(time_rel = time - min(time)) %>%
   ungroup()
 
-tmp_dat_all$agegroup <- factor(tmp_dat_all$agegroup, levels=c("All","1-4","5-14","15-44","45-64","65+"))
+tmp_dat_all$agegroup <- factor(tmp_dat_all$agegroup, levels=c("All","0-4","5-14","15-44","45-64","65+"))
 
 
 raw_data <- overall_ILIplus %>% group_by(group) %>% 
   mutate(gr = log((ILIplus+0.1)/lag(ILIplus+0.1,1))) %>%
   #mutate(gr = zoo::rollmean(gr,3,fill=NA,align='right')) %>%
   rename(agegroup=group)
-raw_data$agegroup <- factor(raw_data$agegroup, levels=c("All","1-4","5-14","15-44","45-64","65+"))
+raw_data$agegroup <- factor(raw_data$agegroup, levels=c("All","0-4","5-14","15-44","45-64","65+"))
 
 
 tmp_dat_all <- tmp_dat_all %>% left_join(time_key) %>% distinct()
