@@ -585,20 +585,22 @@ gr_flunet_dat <- gr_flunet_dat %>%
 
 max_t <- max(gr_flunet_dat %>% select(season, day_of_year) %>% distinct() %>% pull(day_of_year))
 min_t <- min(gr_flunet_dat %>% select(season, day_of_year) %>% distinct() %>% pull(day_of_year))
-breaks <- seq(150,max_t,by=50)
-labels <- if_else(breaks > 365, breaks - 365, breaks)
-p_gr_flunet_by_day<- ggplot(data=gr_flunet_dat%>% filter(plot_label != "During pandemic")) + 
+
+p_gr_flunet_by_day<- ggplot(data=gr_flunet_dat%>% filter(plot_label != "During pandemic") %>%
+                              mutate(date_use = day_of_year + as.Date("2001-01-01"))) + 
   geom_hline(yintercept=0,linetype="dashed") +
-  geom_vline(xintercept=365,linetype="dashed") +
-  geom_ribbon(aes(x=day_of_year,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
-  geom_line(aes(x=day_of_year,y=y,group=season,col=plot_label),linewidth=0.75) +
-  xlab("Day of year (start of Epi week)") + ylab('Growth rate (per week)') +
+  geom_vline(xintercept=as.Date("2002-01-01"),linetype="dashed") +
+  #geom_vline(xintercept=365,linetype="dashed") +
+  geom_ribbon(aes(x=date_use,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
+  geom_line(aes(x=date_use,y=y,group=season,col=plot_label),linewidth=0.75) +
+  xlab("Date") + ylab('Growth rate (per week)') +
   scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
   scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
   scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,by=0.2)) +
-  scale_x_continuous(breaks=breaks,labels=labels) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%d %b") +
   coord_cartesian(ylim=c(-1.1,1.1)) +  theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
+
 
 
 ## Align by peak data
@@ -765,21 +767,21 @@ min_t <- min(gr_case_dat %>% select(season, day_of_year) %>% distinct() %>% pull
 breaks <- seq(150,max_t,by=50)
 labels <- if_else(breaks > 365, breaks - 365, breaks)
 
-p_gr_case_by_day<- ggplot(data=gr_case_dat %>% filter(plot_label != "During pandemic")) + 
+p_gr_case_by_day<- ggplot(data=gr_case_dat %>% filter(plot_label != "During pandemic") %>%
+                            mutate(season_date = day_of_year + as.Date("2001-01-01"))) + 
   geom_hline(yintercept=0,linetype="dashed") +
-  geom_vline(xintercept=365,linetype="dashed") +
-  geom_ribbon(aes(x=day_of_year,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
+  geom_vline(xintercept=as.Date("2002-01-01"),linetype="dashed") +
+  geom_ribbon(aes(x=season_date,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
   # geom_ribbon(aes(x=day_of_year,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
-  geom_line(aes(x=day_of_year,y=y,group=season,col=plot_label),size=0.75) +
+  geom_line(aes(x=season_date,y=y,group=season,col=plot_label),size=0.75) +
   #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
-  xlab("Day of year (start of Epi week)") + ylab('Growth rate (per week)') +
+  xlab("Date") + ylab('Growth rate (per week)') +
   #scale_color_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
   #scale_fill_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
   scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
   scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
   scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,by=0.2)) +
-  scale_x_continuous(breaks=breaks,labels=labels) +
-  
+  scale_x_date(date_breaks = "1 month", date_labels = "%d %b") +  
   coord_cartesian(ylim=c(-1.1,1.1)) +
   theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
@@ -976,22 +978,24 @@ min_t <- min(gr_case_dat %>% select(season, day_of_year) %>% distinct() %>% pull
 breaks <- seq(150,max_t,by=50)
 labels <- if_else(breaks > 365, breaks - 365, breaks)
 
-p_gr_case_by_day<- ggplot(data=gr_case_dat %>% filter(plot_label != "During pandemic")) + 
-  geom_vline(xintercept=365,linetype="dashed") +
+
+p_gr_case_by_day<- ggplot(data=gr_case_dat %>% filter(plot_label != "During pandemic") %>%
+                            mutate(season_date = day_of_year + as.Date("2001-01-01"))) + 
+  geom_vline(xintercept=as.Date("2002-01-01"),linetype="dashed") +
   geom_hline(yintercept=0,linetype="dashed") +
-  geom_ribbon(aes(x=day_of_year,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
+  geom_ribbon(aes(x=season_date,ymin=lb_50,ymax=ub_50,group=season,fill=plot_label),alpha=0.1) +
   # geom_ribbon(aes(x=day_of_year,ymin=lb_95,ymax=ub_95,group=season),alpha=0.5,fill="blue") +
-  geom_line(aes(x=day_of_year,y=y,group=season,col=plot_label),size=0.75) +
+  geom_line(aes(x=season_date,y=y,group=season,col=plot_label),size=0.75) +
   #geom_line(data=raw_data,aes(x=date,y=gr,col=agegroup),alpha=0.4) +
-  xlab("Day of year (start of Epi week)") + ylab('Growth rate (per week)') +
+  xlab("Date") + ylab('Growth rate (per week)') +
   #scale_color_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
   #scale_fill_manual(values=c("Pre-pandemic"="blue","During pandemic"="black","Post-pandemic"="orange","Current season"="red"))+
   scale_color_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
   scale_fill_manual("Time period",values=c("Pre-pandemic"="grey","Post-pandemic"="#0072B2","Current season"="#D55E00")) +
   scale_y_continuous(limits=c(-1,1),breaks=seq(-1,1,by=0.2)) +
-  scale_x_continuous(breaks=breaks,labels=labels) +
+  #scale_x_continuous(breaks=breaks,labels=labels) +
   coord_cartesian(ylim=c(-1.1,1.1)) +
-  
+  scale_x_date(date_breaks = "1 month", date_labels = "%d %b") +
   theme_use + 
   theme(legend.position="bottom",legend.direction="horizontal")
 
@@ -1122,10 +1126,10 @@ ggsave("figures/figS4.png",figS4,width=8,height=8)
 p_main_all <- p_gr_case_all_by_dayb + labs(tag="") + theme(axis.title=element_text(size=16),axis.text=element_text(size=12),legend.text=element_text(size=12),
                             legend.title=element_text(size=12),plot.title=element_text(size=16)) +
   ggtitle("Weekly growth rate of all influenza cases") +
-  xlab("Day of year") +
+  xlab("Date") +
   coord_cartesian(ylim=c(-1,1))+
   geom_label_repel(
-    data = label_dat_all,
+    data = label_dat_all %>% mutate(day_of_year = as.Date("2001-01-01") + day_of_year),
     aes(
       x = day_of_year,
       y = y,
@@ -1140,7 +1144,8 @@ p_main_all <- p_gr_case_all_by_dayb + labs(tag="") + theme(axis.title=element_te
     nudge_y=0.08,
     direction="both"
   ) +
-  geom_label(data=data.frame(x=366,y=-1.04,label="1st January"),aes(x=x,y=y,label=label))
+  geom_label(data=data.frame(x=as.Date("2002-01-01"),y=-1.04,label="1st January"),aes(x=x,y=y,label=label)) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%d %b") 
 ggsave("figures/Fig1.pdf",p_main_all,width=10,height=6)
 ggsave("figures/Fig1.png",p_main_all,width=10,height=6)
 

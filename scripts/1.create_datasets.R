@@ -176,6 +176,7 @@ final_dataset <- left_join(rcgp_subtype, rcgp_flu%>%
                               mutate(age = if_else(age == "<5","0-4",age)) ) %>% rename(group=age) %>% left_join(ili_cases_comb_expanded_grouped %>% mutate(date = date + 1)) %>%
   mutate(Influenza = ILI * flu_prop_smooth) %>%
   mutate(ILI_plus = ILI * flu_prop_smooth * percentage_h3_new) 
+write_csv(final_dataset, "data/rcgp_ili_flu_by_age_detailed.csv")
 final_dataset_app <- final_dataset %>% 
   filter(date >= "2022-01-01") %>%
   filter(date <= "2023-12-31") %>%

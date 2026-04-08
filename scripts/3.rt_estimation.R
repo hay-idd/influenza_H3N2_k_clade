@@ -7,6 +7,7 @@ library(patchwork)
 library(tidyr)
 library(ggthemes)
 library(reshape2)
+library(readr)
 
 #set the working directory 
 setwd("~/Documents/GitHub/influenza_H3N2_k_clade/")
@@ -276,11 +277,32 @@ Rt_peak_df <- Rt_df %>%
   slice_max(Rt_mean, n = 1, with_ties = FALSE) %>%
   ungroup()
 
+start_doy <- 150L
+anchor_year <- 2001L   # non-leap year, so day 150 = May 30
 
+Rt_df <- Rt_df %>%
+  mutate(
+    season_date = as.Date(sprintf(
+      "%d-%02d-%02d",
+      if_else(yday(date) >= start_doy, anchor_year, anchor_year + 1L),
+      month(date),
+      day(date)
+    ))
+  )
+
+Rt_peak_df <- Rt_peak_df %>%
+  mutate(
+    season_date = as.Date(sprintf(
+      "%d-%02d-%02d",
+      if_else(yday(date) >= start_doy, anchor_year, anchor_year + 1L),
+      month(date),
+      day(date)
+    ))
+  )
 
 p_Rt <- ggplot(Rt_df %>% filter(!(season %in% c("2008/09","2009/10","2010/11",
                                                 "2019/20","2021/22"))),
-               aes(x = day_in_season, y = Rt_mean, color = subtype)) +
+               aes(x = season_date, y = Rt_mean, color = subtype)) +
   geom_hline(yintercept = c(1), linetype = "dashed", color = "grey40",linewidth=0.5) +
   geom_line(size = 1) +
   #ylim(0,3)+
@@ -291,6 +313,7 @@ p_Rt <- ggplot(Rt_df %>% filter(!(season %in% c("2008/09","2009/10","2010/11",
   ) +
   coord_cartesian(ylim=c(0,2)) +
   scale_y_continuous(breaks=seq(0,2,by=0.5)) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
   facet_wrap( ~ season, ncol=2) +
   scale_color_manual(name = "Dominant influenza A subtype", values = c("#CC79A7","#0072B2")) +
   scale_fill_manual(name = "Dominant influenza A subtype", values = c("#CC79A7","#0072B2")) +
@@ -305,15 +328,15 @@ p_Rt <- ggplot(Rt_df %>% filter(!(season %in% c("2008/09","2009/10","2010/11",
   ) +
   geom_vline(
     data = Rt_peak_df,
-    aes(xintercept = day_in_season, color = subtype),
+    aes(xintercept = season_date, color = subtype),
     linetype = "dashed",
     linewidth = 0.7
   ) +
   geom_text(
     data = Rt_peak_df %>% filter(!(season == "2023/24" & subtype == "A/H3N2")),
     aes(
-      x = 150,
-      y = 1.3,
+      x = as.Date("2001-01-01") + 160,
+      y = 1.5,
       label = sprintf(
         "Rt = %.2f (%.2f–%.2f)\n%s",
         Rt_mean, Rt_lower, Rt_upper, date
@@ -330,8 +353,8 @@ p_Rt <- ggplot(Rt_df %>% filter(!(season %in% c("2008/09","2009/10","2010/11",
 pl<-(p_incidence | p_Rt) + plot_layout(guides="collect") & theme(legend.position="bottom")
 pl
 
-ggsave("figures/Fig3.png",p_Rt,height =12 ,width = 8)
-ggsave("figures/Fig3.pdf",p_Rt,height =12 ,width = 8)
+ggsave("figures/Fig2.png",p_Rt,height =12 ,width = 8)
+ggsave("figures/Fig2.pdf",p_Rt,height =12 ,width = 8)
 ggsave("figures/figS7.png",p_incidence + theme(legend.position="bottom"),height =10 ,width = 7)
 ggsave("figures/figS7.pdf",p_incidence+ theme(legend.position="bottom"),height =10 ,width = 7)
 

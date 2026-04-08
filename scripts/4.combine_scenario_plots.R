@@ -153,15 +153,32 @@ pad_df <- tibble::tibble(
 )%>% filter(Scenario != "I. Two weeks earlier seeding and 5% immune escape")
 
 # ---- build shared-facet plot ----
+final_dataset_current <- final_dataset %>% filter(Season== "2025/26" ) %>% 
+  group_by(Season) %>% mutate(day_from_start = date - as.Date(paste0(min(Year),"-01-01"))) %>% ungroup() %>%
+  mutate(date_use = as.Date("2022-01-01") + day_from_start)
+
+convert_age_groups <- c("0-4"="[0,5)","5-18"="[5,18)","19-64"="[18,65)","65+"="65+")
+final_dataset_current$age_group <- convert_age_groups[final_dataset_current$group]
+
 p <- ggplot() +
-  geom_blank(data = pad_df, aes(x = as.Date("2022-10-10"), y = y)) +
+  geom_blank(data = pad_df, #%>% 
+               #filter(Scenario == "A. Base case (loosely based on 2022/23)"), 
+             aes(x = as.Date("2022-10-10"), y = y)) +
   
-  geom_rect(data = rects_df %>% filter(Scenario != "I. Two weeks earlier seeding and 5% immune escape"), aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = fill),
+  geom_rect(data = rects_df %>% 
+              #filter(Scenario == "A. Base case (loosely based on 2022/23)"), 
+              filter(Scenario != "I. Two weeks earlier seeding and 5% immune escape"), 
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = fill),
             inherit.aes = FALSE, alpha = 0.25) +
-  geom_line(data = combined_inc%>% filter(Scenario != "I. Two weeks earlier seeding and 5% immune escape"), aes(x = date, y = incidence, color = age_group, group = age_group), size = 0.9) +
+  geom_line(data = combined_inc%>% 
+              #filter(Scenario == "A. Base case (loosely based on 2022/23)"), 
+            filter(Scenario != "I. Two weeks earlier seeding and 5% immune escape"), 
+            aes(x = date, y = incidence, color = age_group, group = age_group,linetype="Modelled"), size = 0.9) +
+  geom_line(data=final_dataset_current, aes(x=date_use,y=ILI_plus, col=age_group,group=age_group,linetype="Observed 2025/26"),linewidth=0.75,alpha=0.5) +
   facet_wrap(~ Scenario, ncol = ncol_out,scales="free_y") +
   scale_color_brewer("Age group", palette = "Set1") +
   scale_fill_brewer("Holiday period", palette = "Set2") +
+  scale_linetype_manual("Data type", values = c("solid", "dashed"), labels = c("Modelled", "Observed 2025/26")) +
   #geom_label(data = annots_df, aes(x = x, y = y, label = label), inherit.aes = FALSE,
   #           hjust = 1, vjust = 1, size = 3.2, fill = "white", alpha = 0.85) +
   theme_bw() +
@@ -183,6 +200,7 @@ p <- ggplot() +
   coord_cartesian(expand = TRUE,xlim=as.Date(c("2022-09-30","2023-02-01")))
 p
 
+
 # Save
 ggsave(paste0(save_wd,out_png), p, width = 9, height = 11, dpi = 300)
 ggsave(paste0(save_wd,out_pdf), p+
@@ -193,6 +211,63 @@ ggsave(paste0(save_wd,out_pdf), p+
                legend.text=element_text(size=12),
                title = element_text(size=16)), width = 12, height = 12, dpi = 300)
 message("Saved combined plot: ", out_png)
+
+## Plot the model fit
+final_dataset_current <- final_dataset %>% filter(Season== "2022/23" ) %>% 
+  group_by(Season) %>% mutate(day_from_start = date - as.Date(paste0(min(Year),"-01-01"))) %>% ungroup() %>%
+  mutate(date_use = as.Date("2022-01-01") + day_from_start)
+
+convert_age_groups <- c("0-4"="[0,5)","5-18"="[5,18)","19-64"="[18,65)","65+"="65+")
+final_dataset_current$age_group <- convert_age_groups[final_dataset_current$group]
+
+p_fit <- ggplot() +
+  geom_blank(data = pad_df %>% 
+             filter(Scenario == "A. Base case (loosely based on 2022/23)"), 
+             aes(x = as.Date("2022-10-10"), y = y)) +
+  
+  geom_rect(data = rects_df %>% 
+              filter(Scenario == "A. Base case (loosely based on 2022/23)"), 
+            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = fill),
+            inherit.aes = FALSE, alpha = 0.25) +
+  geom_line(data = combined_inc%>% 
+            filter(Scenario == "A. Base case (loosely based on 2022/23)"), 
+            aes(x = date, y = incidence, color = age_group, group = age_group,linetype="Modelled"), size = 0.9) +
+  geom_line(data=final_dataset_current, aes(x=date_use,y=ILI_plus, col=age_group,group=age_group,linetype="Observed 2022/23"),linewidth=1,alpha=0.5) +
+  
+  scale_linetype_manual("Data type", values = c("solid", "dashed"), labels = c("Modelled", "Observed 2022/23")) +
+  scale_color_brewer("Age group", palette = "Set1") +
+  scale_fill_brewer("Holiday period", palette = "Set2") +
+  #geom_label(data = annots_df, aes(x = x, y = y, label = label), inherit.aes = FALSE,
+  #           hjust = 1, vjust = 1, size = 3.2, fill = "white", alpha = 0.85) +
+  theme_bw() +
+  labs(x = "Date", y = "Reported symptomatic influenza (weekly)") +
+  guides(
+    color = guide_legend(order = 1),
+    fill  = guide_legend(order = 2)
+  ) +
+  theme(
+    strip.text = element_text(size = 10),
+    axis.text.x = element_text(size=10),
+    legend.position = "bottom",
+    plot.margin = margin(20, 20, 20, 20, "pt"),
+    legend.box = "vertical",              # <-- stack legends vertically
+    legend.spacing.y = unit(4, "pt"),     # <-- spacing between legend boxes
+    panel.spacing.x = unit(1, "cm")       # (your earlier spacing adjustment)
+  ) +
+  scale_y_continuous(breaks=seq(0,10000,by=1000)) +
+  coord_cartesian(expand = TRUE,xlim=as.Date(c("2022-09-30","2023-02-01")))
+p_fit
+
+# Save
+ggsave(paste0(save_wd,"model_fit.png"), p_fit, width = 8, height = 6, dpi = 300)
+ggsave(paste0(save_wd,"model_fit.pdf"), p_fit+
+         theme(axis.text = element_text(size=12),
+               axis.title = element_text(size=14),
+               strip.text = element_text(size=14),
+               legend.title=element_text(size=12),
+               legend.text=element_text(size=12),
+               title = element_text(size=16)), width = 8, height = 6, dpi = 300)
+
 
 ## Pull out just over 65
 p_65 <- ggplot() +
