@@ -165,15 +165,15 @@ epi_ode_size <- function(C1, beta, Tg, Ns, alphas, kappa = NULL,
   
   #beta_scales <- rep(beta_scales, each=Nimmunity)
   if(ver == "fast" & class(C) != "list"){
-    y <- ode(y=start,t=ts,func=general_sir, parms=c(beta,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity)
+    y <- ode(y=start,t=ts,func=general_sir, parms=c(beta,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity,rtol=1e-8,atol=1e-8)
   } else if(class(C) == 'list') {
     if(is.null(kappa)){
-      y <- ode(y=start,t=ts,func=general_sir_timevarying_C, parms=c(beta,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity)
+      y <- ode(y=start,t=ts,func=general_sir_timevarying_C, parms=c(beta,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity,rtol=1e-8,atol=1e-8)
     } else {
-      y <- ode(y=start,t=ts,func=general_sir_timevarying_C_symp, parms=c(beta,kappa,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity)
+      y <- ode(y=start,t=ts,func=general_sir_timevarying_C_symp, parms=c(beta,kappa,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity,rtol=1e-8,atol=1e-8)
     }
   } else {
-    y <- ode(y=start,t=ts,func=general_sir_explicit, parms=c(beta,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity)
+    y <- ode(y=start,t=ts,func=general_sir_explicit, parms=c(beta,alphas,Tg),C=C,Nage=Nage,Nimmunity=Nimmunity,rtol=1e-8,atol=1e-8)
   }
   
   

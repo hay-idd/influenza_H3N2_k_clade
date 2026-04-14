@@ -1013,6 +1013,7 @@ max_gr <- gr_case_dat1 %>% group_by(season) %>% filter(y == max(y))# %>% select(
 
 max_gr %>% select(season, Year, Week, date, y, lb_95, ub_95) %>% arrange(season) %>% tail(5) %>% print()
 
+write_csv(max_gr, "results/growth_rate_peaks.csv")
 
 gr_case_dat <- gr_case_dat %>% left_join(max_gr %>% select(season, day_of_year) %>% rename(peak_time = day_of_year))
 gr_case_dat$day_shifted <- gr_case_dat$day_of_year - gr_case_dat$peak_time

@@ -25,6 +25,7 @@ data("polymod")
 contacts_all <- polymod$contacts
 polymod_base <- polymod
 
+set.seed(123)
 
 # ---- core runner: run_model_once (takes a named list of parameters) ----
 run_model_once <- function(params) {
@@ -348,6 +349,14 @@ ylims <- tibble(
   ymin = c(0, 0, 0, 0),
   ymax = c(0.35, 0.35, 1.5, 5000)
 )
+
+
+## Add peak growth rate for 2022/23 and 2025/26
+max_grs <- read_csv("~/Documents/GitHub/influenza_H3N2_k_clade/results/growth_rate_peaks.csv")
+max_grs <- max_grs %>% filter(season %in% c("2025/26","2022/23")) %>% select(y,season) %>% mutate(name = "Peak growth rate") %>%
+  rename(`Surveillance data`=season)
+
+
 p_r0 <- ggplot(results_tbl_R0_long) + 
   geom_blank(
     data = ylims,
@@ -358,11 +367,13 @@ p_r0 <- ggplot(results_tbl_R0_long) +
     aes(y = ymax)
   ) +
   geom_vline(xintercept=1.9, linetype="dashed", color="grey") +
+  geom_hline(data=max_grs,aes(yintercept=y,linetype=`Surveillance data`)) +
   geom_line(aes(x=variable, y=value, color=name),linewidth=0.75) +
+  scale_linetype_manual(values=c("2022/23"="dashed","2025/26"="dotted")) +
   facet_wrap(~name,scales="free_y",nrow=1) +
   xlab("R0") +
   ylab("Value") +
-  scale_color_brewer("Metric", palette="Set2") +
+  scale_color_brewer("Metric", palette="Set2",guide="none") +
   theme_bw() +
   scale_y_continuous(expand=c(0,0)) +
   theme(legend.position="bottom")
@@ -383,6 +394,7 @@ ylims <- tibble(
 p_escape <- ggplot(results_tbl_escape_long) +
   geom_vline(xintercept=1, linetype="dashed", color="grey") +
   geom_line(aes(x=variable, y=value, color=name),linewidth=0.75) + 
+  geom_hline(data=max_grs,aes(yintercept=y,linetype=`Surveillance data`)) +
   
   geom_blank(
     data = ylims,
@@ -398,10 +410,11 @@ p_escape <- ggplot(results_tbl_escape_long) +
   
   facet_wrap(~name,scales="free_y",nrow=1) +
   xlab("Proportion immune relative\n to baseline") +
-  scale_linetype_manual(values=c("WHO FluNet"="dashed","RCGP"="dotted")) +
+  #scale_linetype_manual(values=c("WHO FluNet"="dashed","RCGP"="dotted")) +
+  scale_linetype_manual(values=c("2022/23"="dashed","2025/26"="dotted")) +
   scale_y_continuous(expand=c(0,0)) +
   ylab("Value") +
-  scale_color_brewer("Metric", palette="Set2") +
+  scale_color_brewer("Metric", palette="Set2",guide="none") +
   theme_bw() +
   theme(legend.position="bottom")
 p_escape
@@ -420,6 +433,7 @@ ylims <- tibble(
 
 p_escape_young <- ggplot(results_tbl_young_escape_long) +
   geom_vline(xintercept=1, linetype="dashed", color="grey") +
+  geom_hline(data=max_grs,aes(yintercept=y,linetype=`Surveillance data`)) +
   
   geom_blank(
     data = ylims,
@@ -438,8 +452,9 @@ p_escape_young <- ggplot(results_tbl_young_escape_long) +
   facet_wrap(~name,scales="free_y",nrow=1) +
   xlab("Proportion immune relative\n to baseline in <18") +
   ylab("Value") +
-  scale_color_brewer("Metric", palette="Set2") +
-  scale_linetype_manual(values=c("WHO FluNet"="dashed","RCGP"="dotted")) +
+  scale_color_brewer("Metric", palette="Set2",guide="none") +
+  #scale_linetype_manual(values=c("WHO FluNet"="dashed","RCGP"="dotted")) +
+  scale_linetype_manual(values=c("2022/23"="dashed","2025/26"="dotted")) +
   theme_bw() +
   scale_y_continuous(expand=c(0,0)) +
   theme(legend.position="bottom")
@@ -459,6 +474,7 @@ ylims <- tibble(
 
 p_seed <- ggplot(results_tbl_seed_long) +
   geom_vline(xintercept=as.Date("2022-09-19"), linetype="dashed", color="grey") +
+  geom_hline(data=max_grs,aes(yintercept=y,linetype=`Surveillance data`)) +
   geom_blank(
     data = ylims,
     aes(y = ymin)
@@ -475,8 +491,9 @@ p_seed <- ggplot(results_tbl_seed_long) +
   facet_wrap(~name,scales="free_y",nrow=1) +
   xlab("Seed date (1000 infections)") +
   ylab("Value") +
-  scale_color_brewer("Metric", palette="Set2") +
-  scale_linetype_manual(values=c("WHO FluNet"="dashed","RCGP"="dotted")) +
+  scale_color_brewer("Metric", palette="Set2",guide="none") +
+  scale_linetype_manual(values=c("2022/23"="dashed","2025/26"="dotted")) +
+  #scale_linetype_manual(values=c("WHO FluNet"="dashed","RCGP"="dotted")) +
   theme_bw() +
   scale_y_continuous(expand=c(0,0)) +
   theme(legend.position="bottom")
@@ -485,12 +502,14 @@ p_main <- p_r0/
   p_escape/
   p_escape_young/
   p_seed + plot_layout(guides="collect")&
-  theme(legend.position='none',axis.text = element_text(size=12),
+  theme(legend.position='bottom',axis.text = element_text(size=12),
         axis.title = element_text(size=14),
         strip.text = element_text(size=12),
         legend.title=element_text(size=12),
         legend.text=element_text(size=12),
         title = element_text(size=16))
+
+
 
 ggsave("~/Documents/GitHub/influenza_H3N2_k_clade/figures/fig_model_grid_results.png", p_main, width=10, height=10)
 ggsave("~/Documents/GitHub/influenza_H3N2_k_clade/figures/fig_model_grid_results.pdf", p_main, width=10, height=10)

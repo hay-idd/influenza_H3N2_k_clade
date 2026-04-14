@@ -7,11 +7,15 @@ library(patchwork)
 setwd("~/Documents/GitHub/influenza_H3N2_k_clade/")
 source("R/funcs.R")
 
+## If TRUE, uses the data as of April 2026. If FALSE, uses the data as of the time of submission (mid December)
+use_updated_data <- FALSE
+
 save_wd <- "figures/raw_data/"
 
 theme_use <- theme_bw()
 
-date_max <- as.Date("2025-12-08")
+#date_max <- as.Date("2025-12-08")
+date_max <- as.Date("2026-03-30")
 
 desired_age_groups <- c("0-4","5-18","19-64","65+")
 
@@ -33,7 +37,12 @@ get_age_group_n(age_groups, 0, 4)
 ## First dataset -- ILI overall and by age
 ######################################################
 ## Read in ILI per 100,000 by age group
+if(use_updated_data){
+  ili_cases_recent <- read_csv("data/rcgp_ili_2023_2025_updated.csv") %>% fill(Year,.direction="down") %>% arrange(Year,Week) %>% drop_na()
+  
+} else {
 ili_cases_recent <- read_csv("data/rcgp_ili_2023_2025.csv") %>% fill(Year,.direction="down") %>% arrange(Year,Week) %>% drop_na()
+}
 ili_cases_older <- read_csv("data/rcgp_ili_2021_2023.csv")%>% 
   fill(Year,.direction="down")%>% 
   arrange(Year,Week)
@@ -84,8 +93,12 @@ p_ili_by_age <- ggplot(ili_cases_comb_expanded_grouped) +
 
 ili_cases_comb_expanded_grouped <- ili_cases_comb_expanded_grouped %>%
   mutate(Season = flu_season(date))
-write_csv(ili_cases_comb_expanded_grouped,"data/rcgp_ili_by_age_detailed.csv")
 
+if(use_updated_data){
+  write_csv(ili_cases_comb_expanded_grouped,"data/rcgp_ili_by_age_detailed_updated.csv")
+} else {
+  write_csv(ili_cases_comb_expanded_grouped,"data/rcgp_ili_by_age_detailed.csv")
+}
 ######################################################
 ## Second dataset -- % of tests which are positive for influenza and by subtype from RCGP
 ######################################################
@@ -99,7 +112,11 @@ rcgp_flu_22_23 <- rcgp_flu %>% mutate(total_tests = `Influenza` + `COVID-19` + `
 age_key1 <- c("less than 5"="<5", "19-64"="19-64",   "05to 18"="5-18", "65+"="65+")
 rcgp_flu_22_23$age <- age_key1[rcgp_flu_22_23$age]
 ## 2024-25 
+if(use_updated_data){
+rcgp_flu <- read_csv("data/rcgp_influenza_pos_2024_2026_updated.csv")
+} else{
 rcgp_flu <- read_csv("data/rcgp_influenza_pos_2024_2025.csv")
+}
 rcgp_flu <- rcgp_flu %>% mutate(date=lubridate::dmy(date_start))
 rcgp_flu <- rcgp_flu %>% mutate(age=if_else(age == "19-65","19-64",age))
 rcgp_flu_24_25 <- rcgp_flu %>% 
@@ -141,8 +158,13 @@ rcgp_subtype_22_23 <- rcgp_subtype_22_23 %>% rowwise() %>%
   select(date,age,percentage_h3,percentage_h3_new,percentage_h1n1,percentage_h1n1_new,percentage_b)
 
 ## Get 2024/25 data
-rcgp_subtype_24_25 <- read_csv("data/rcgp_subtype_pos_2024_2025.csv")
-rcgp_subtype_24_25 <- rcgp_subtype_24_25 %>% mutate(date=lubridate::ymd(date_start))
+if(use_updated_data){
+  rcgp_subtype_24_25 <- read_csv("data/rcgp_subtype_pos_2024_2026_updated.csv")
+} else {
+  rcgp_subtype_24_25 <- read_csv("data/rcgp_subtype_pos_2024_2025.csv")
+}
+#rcgp_subtype_24_25 <- rcgp_subtype_24_25 %>% mutate(date=lubridate::ymd(date_start))
+rcgp_subtype_24_25 <- rcgp_subtype_24_25 %>% mutate(date=lubridate::dmy(date_start))
 rcgp_subtype_24_25 <- rcgp_subtype_24_25 %>% 
   pivot_wider(names_from=virus,values_from=percent) %>%
   rowwise() %>% 
@@ -176,7 +198,12 @@ final_dataset <- left_join(rcgp_subtype, rcgp_flu%>%
                               mutate(age = if_else(age == "<5","0-4",age)) ) %>% rename(group=age) %>% left_join(ili_cases_comb_expanded_grouped %>% mutate(date = date + 1)) %>%
   mutate(Influenza = ILI * flu_prop_smooth) %>%
   mutate(ILI_plus = ILI * flu_prop_smooth * percentage_h3_new) 
-write_csv(final_dataset, "data/rcgp_ili_flu_by_age_detailed.csv")
+
+if(use_updated_data){
+  write_csv(final_dataset, "data/rcgp_ili_flu_by_age_detailed_updated.csv")
+} else {
+  write_csv(final_dataset, "data/rcgp_ili_flu_by_age_detailed.csv")
+}
 final_dataset_app <- final_dataset %>% 
   filter(date >= "2022-01-01") %>%
   filter(date <= "2023-12-31") %>%
@@ -207,14 +234,20 @@ p_final <- final_dataset %>%
   theme_use +
   scale_colour_brewer(palette="Set1",name="Age group") 
 
-
+if(use_updated_data){
+  write_csv(final_dataset,"data/ili_plus_datasets_by_age_updated.csv")
+} else {
 write_csv(final_dataset,"data/ili_plus_datasets_by_age.csv")
-
+}
 ######################################################
 ## Third dataset -- Respiratory DataMart cases
 ######################################################
 ## Compare to UKHSA influenza case counts England 2009-2025
-influenza_cases_eng <- read_csv("data/raw/resp_datamart_all_flu.csv")
+if(use_updated_data){
+influenza_cases_eng <- read_csv("data/raw/resp_datamart_all_flu_updated.csv")
+} else {
+  influenza_cases_eng <- read_csv("data/raw/resp_datamart_all_flu.csv")
+}
 influenza_cases_eng$date <- lubridate::dmy(influenza_cases_eng$date)
 influenza_cases_eng <- influenza_cases_eng %>% filter(date < date_max) %>%
   mutate(total_cases = `Influenza A H1N1pdm09` + `Influenza A H3N2` + `Influenza A not subtyped` + `Influenza B`)
@@ -230,19 +263,28 @@ influenza_cases_eng <- influenza_cases_eng %>%
 
 influenza_cases_eng <- influenza_cases_eng %>% mutate(Season = flu_season(date)) 
 
-write_csv(influenza_cases_eng,"data/resp_datamart_influenza_cases_england.csv")
+if(use_updated_data){
+  write_csv(influenza_cases_eng,"data/resp_datamart_influenza_cases_england_updated.csv")
+} else {
+  write_csv(influenza_cases_eng,"data/resp_datamart_influenza_cases_england.csv")
+  
+}
 
 ######################################################
 ## Fourth dataset -- Respiratory DataMart cases
 ######################################################
 ## Compare to WHO FluNet data
-flunet_data <- read_csv("data/raw/FlunetData_United Kingdom, England_All Sites_for_03 January 2011 to 15 December 2025.csv") %>% select(-1) %>% select(-c(11))
+if(use_updated_data){
+flunet_data <- read_csv("data/raw/FlunetData_United Kingdom, England_All Sites_for_01 January 2010 to 23 March 2026.csv") %>% select(-1) %>% select(-c(11))
+} else {
+  flunet_data <- read_csv("data/raw/FlunetData_United Kingdom, England_All Sites_for_03 January 2011 to 15 December 2025.csv") %>% select(-1) %>% select(-c(11))
+}
 
 colnames(flunet_data) <- c("country","surv_type","year_week","week_start","N","flu_pos","flu_neg","H1N1pdm","H3","not_subtyped")
 ## Create integer time index from the weeks
 t_start <- flunet_data$week_start[1]
 time_key <- data.frame(week_start=seq(from=as.Date(t_start),
-                                      to=as.Date("2026-01-01"),
+                                      to=as.Date("2026-04-01"),
                                       by="week"))
 time_key$index <- 1:nrow(time_key)
 flunet_data <- flunet_data %>% left_join(time_key)
@@ -267,7 +309,11 @@ flunet_data <- flunet_data %>% rename(date=week_start) %>% mutate(Year=lubridate
 flunet_data <- flunet_data %>% filter(date < date_max)
 flunet_data <- flunet_data %>% mutate(Season = flu_season(date))
 
-write_csv(flunet_data,"data/WHO_flunet_cases.csv")
+if(use_updated_data){
+  write_csv(flunet_data,"data/WHO_flunet_cases_updated.csv")
+} else {
+  write_csv(flunet_data,"data/WHO_flunet_cases.csv")
+}
 
 p1 <- ggplot(flunet_data) + geom_line(aes(x=date,y=H3_sum,col="WHO FluNet A/H3N2"),linewidth=0.65) +
   geom_line(data=influenza_cases_eng,aes(x=date,y=`Influenza A H3N2`,col="UKHSA A/H3N2"),linewidth=0.65) +
@@ -310,3 +356,4 @@ figS3 <- p_final
 ggsave("figures/figS1.png",figS1,width=8,height=6,units="in",dpi=300)
 ggsave("figures/figS2.png",figS2,width=8,height=6,units="in",dpi=300)
 ggsave("figures/figS3.png",figS3,width=8,height=8,units="in",dpi=300)
+

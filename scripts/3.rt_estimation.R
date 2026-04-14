@@ -336,7 +336,7 @@ p_Rt <- ggplot(Rt_df %>% filter(!(season %in% c("2008/09","2009/10","2010/11",
     data = Rt_peak_df %>% filter(!(season == "2023/24" & subtype == "A/H3N2")),
     aes(
       x = as.Date("2001-01-01") + 160,
-      y = 1.5,
+      y = 1.3,
       label = sprintf(
         "Rt = %.2f (%.2f–%.2f)\n%s",
         Rt_mean, Rt_lower, Rt_upper, date
