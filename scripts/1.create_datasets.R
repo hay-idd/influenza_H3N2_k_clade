@@ -82,7 +82,7 @@ ili_cases_comb_expanded <- bind_rows(ili_cases_older_expanded, ili_cases_recent_
 
 ## Be very careful, as older data does not have any data on 0 year olds, so need to request 1-14 only
 ili_cases_comb_expanded_grouped <- combine_age_groups_ILI(ili_cases_comb_expanded,desired_age_groups)
-
+break
 p_ili_by_age <- ggplot(ili_cases_comb_expanded_grouped) + 
   geom_line(aes(x=date,y=ILI*100000/N,colour=group)) + 
   theme_use + 

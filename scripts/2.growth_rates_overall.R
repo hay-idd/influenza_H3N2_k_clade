@@ -1147,8 +1147,11 @@ p_main_all <- p_gr_case_all_by_dayb + labs(tag="") + theme(axis.title=element_te
   ) +
   geom_label(data=data.frame(x=as.Date("2002-01-01"),y=-1.04,label="1st January"),aes(x=x,y=y,label=label)) +
   scale_x_date(date_breaks = "1 month", date_labels = "%d %b") 
+p_main_all <- add_doubling_axis(p_main_all)
+
 ggsave("figures/Fig1.pdf",p_main_all,width=10,height=6)
 ggsave("figures/Fig1.png",p_main_all,width=10,height=6)
+ggsave("figures/Fig1.tif",p_main_all,width=10,height=6)
 
 
 p_main_all_shifted <- p_gr_case_all_by_peak1b + labs(tag="") + theme(axis.title=element_text(size=16),axis.text=element_text(size=12),legend.text=element_text(size=12),

@@ -222,6 +222,24 @@ final_dataset_current <- final_dataset %>% filter(Season== "2025/26" ) %>%
 convert_age_groups <- c("0-4"="[0,5)","5-18"="[5,18)","19-64"="[18,65)","65+"="65+")
 final_dataset_current$age_group <- convert_age_groups[final_dataset_current$group]
 
+## Get RMSE between modelled and observed for 2025/26 season (overall and by age group)
+model_inc_raw <- combined_inc %>% filter(Scenario == "A. Base case (loosely based on 2022/23)") %>%
+  select(date, incidence,age_group)
+obs_inc_raw <- final_dataset %>% rename(date = date)  %>% filter(date >= "2022-08-22", date <= "2023-02-27") %>% select(date, ILI_plus, group)%>% rename(age_group=group)
+obs_inc_raw$age_group <- convert_age_groups[obs_inc_raw$age_group]
+
+## Overall RMSE
+RMSE <- left_join(model_inc_raw, obs_inc_raw) %>% mutate(diff = ILI_plus - incidence) %>%summarize(RMSE=sqrt(mean(diff^2)))
+## Overall normalised RMSE
+RMSE / obs_inc_raw %>% group_by(date) %>% summarize(total_ILI_plus = sum(ILI_plus,na.rm=TRUE)) %>% ungroup() %>% filter(total_ILI_plus == max(total_ILI_plus)) %>% pull(total_ILI_plus)
+
+## RMSE by age group
+RMSE_age <- left_join(model_inc_raw, obs_inc_raw) %>% mutate(diff = ILI_plus - incidence) %>% group_by(age_group) %>% summarize(RMSE=sqrt(mean(diff^2)))
+
+## Normalised RMSE by age group
+RMSE_age  %>% left_join(obs_inc_raw %>% group_by(date,age_group) %>% summarize(total_ILI_plus = sum(ILI_plus,na.rm=TRUE)) %>% group_by(age_group) %>% filter(total_ILI_plus == max(total_ILI_plus))) %>%
+  mutate(normalised_RMSE = RMSE / total_ILI_plus) %>% select(age_group, normalised_RMSE)
+
 p_fit <- ggplot() +
   geom_blank(data = pad_df, #%>% 
              #filter(Scenario == "A. Base case (loosely based on 2022/23)"), 
@@ -443,7 +461,7 @@ if (length(base_idx) == 0) {
 }
 
 base_vals <- parsed_annots[base_idx,
-                           c("peak_reported","cumulative_symptomatic","peak_symptomatic_est")] %>%
+                           c("peak_reported","cumulative_symptomatic","peak_symptomatic_est","Peak growth rate")] %>%
   unlist()
 
 parsed_annots <- parsed_annots %>% left_join(annots_gr, by = "Scenario")
@@ -453,7 +471,8 @@ ratio_table <- parsed_annots %>%
   mutate(
     ratio_peak_reported          = peak_reported / base_vals["peak_reported"],
     ratio_cumulative_symptomatic = cumulative_symptomatic / base_vals["cumulative_symptomatic"],
-    ratio_peak_symptomatic_est   = peak_symptomatic_est / base_vals["peak_symptomatic_est"]
+    ratio_peak_symptomatic_est   = peak_symptomatic_est / base_vals["peak_symptomatic_est"],
+    `Ratio Peak growth rate` = `Peak growth rate`/base_vals["Peak growth rate"]
   ) %>%
   select(Scenario, 
          peak_date,
@@ -461,7 +480,7 @@ ratio_table <- parsed_annots %>%
          ratio_peak_reported,
          ratio_cumulative_symptomatic,
          ratio_peak_symptomatic_est,
-         `Peak growth rate`)
+         `Ratio Peak growth rate`)
 
 # --- Print output ---
 parsed_annots

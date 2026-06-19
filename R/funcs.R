@@ -220,7 +220,7 @@ add_doubling_axis <- function(p,n_breaks=11){
     sec.axis = sec_axis(~ .,
                         breaks = breaks,
                         labels = labels,
-                        name = "Doubling(+) / Halving(-) time")
+                        name = "Doubling(+) / Halving(-) time (weeks)")
   )
   
 }

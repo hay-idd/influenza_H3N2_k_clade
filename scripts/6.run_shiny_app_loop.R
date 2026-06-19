@@ -18,18 +18,29 @@ shopping_period_start <- as.Date("2022-12-01")
 shopping_period_end   <- as.Date("2022-12-21")
 winter_holiday_start  <- as.Date("2022-12-21")
 winter_holiday_end    <- as.Date("2023-01-04")
+
+#half_term_start <- as.Date("2023-10-21")
+#half_term_end   <- as.Date("2023-10-30")
+#shopping_period_start <- as.Date("2023-12-01")
+#shopping_period_end   <- as.Date("2023-12-21")
+#winter_holiday_start  <- as.Date("2023-12-21")
+#winter_holiday_end    <- as.Date("2024-01-04")
+
 N_tot <- 60000000
 age_breaks <- c(0,5,18,65)
 
 data("polymod")
 contacts_all <- polymod$contacts
 polymod_base <- polymod
+use_seed <- 123
+set.seed(use_seed)
 
-set.seed(123)
+t_step <- 0.1
+cumu_inc_threshold_peak_gr <- 0
 
 # ---- core runner: run_model_once (takes a named list of parameters) ----
 run_model_once <- function(params) {
-  # params expected keys:
+  # params expected:
   # sim_start_date, sim_end_date, seed_size, R0, gamma, reporting_rate,
   # overall_immune_escape, prop_immune_younger, prop_immune_younger2, prop_immune_older, prop_immune_oldest,
   # prop_home_contacts_in_hols, prop_work_contacts_in_hols, prop_rest_contacts_in_hols,
@@ -58,7 +69,7 @@ run_model_once <- function(params) {
   dates <- seq(start_date, end_date, by = "1 week")
   start_day <- as.numeric(start_date)
   end_day_num <- as.numeric(end_date)
-  ts <- seq(start_day, end_day_num, by = 1) - start_day + 1
+  ts <- seq(start_day, end_day_num, by = t_step) - start_day + 1
   
   # contact matrices
   contact_params <- list(
@@ -69,12 +80,17 @@ run_model_once <- function(params) {
     prop_rest_contacts_in_christmas = p$prop_rest_contacts_in_christmas,
     prop_home_contacts_in_christmas = p$prop_home_contacts_in_christmas
   )
-  cm <- build_contact_matrices(contact_params)
+  cm <- build_contact_matrices(contact_params, seed=use_seed)
   C_term <- cm$term
   C_holidays <- cm$term_break
   C_christmas_break <- cm$christmas_period
   C_xmas_holidays <- cm$christmas_holiday
   polymod_c_term <- cm$polymod_term
+  
+  #C_term <- cm$term
+  #C_holidays <- cm$term
+  #C_christmas_break <- cm$term
+  #C_xmas_holidays <- cm$term
   
   # weights
   weights_res <- make_weights_df(start_date, end_date, smooth_time = 7)
@@ -117,58 +133,75 @@ run_model_once <- function(params) {
                          alphas = alphas,
                          age_seed = 3, immunity_seed = 1,
                          seed_size = p$seed_size, return_compartments = TRUE)
-  
   # extract incidence columns and convert to weekly reported (same as app)
   use_cols <- which(colnames(y_base) %like% "inc")
   ret <- as.matrix(y_base[, use_cols])
-  ret_daily <- apply(ret, 2, function(x) c(0, diff(x))) # daily incidence
+  
+  ## Combine immunity groups
   # combine immunity columns like app: sum pairs to get per-age daily incidence
-  ret_age_daily <- ret_daily[, seq(1, ncol(ret_daily), 2)] + ret_daily[, seq(2, ncol(ret_daily), 2)]
+  ret_age_daily <- ret[, seq(1, ncol(ret), 2)] + ret[, seq(2, ncol(ret), 2)]
+  
+  ## Expand and get 7-day trailing diff
+  ret_age_daily <- ret_age_daily %>% as.data.frame() %>% mutate(time = 1:n()) %>% pivot_longer(-time) %>%
+    group_by(name) %>% mutate(inc = value - lag(value,7/t_step)) %>% select(name, inc,time) %>%
+    pivot_wider(values_from=inc,names_from=name) %>% select(-time) %>% as.matrix()
+  
+  
+  #ret_daily <- apply(ret, 2, function(x) c(0, diff(x))) # daily incidence
   # apply symptomatic fractions and reporting
   symp_frac <- p$symp_fracs
+  
   ret_age_daily_reported <- t(p$reporting_rate * symp_frac * t(ret_age_daily))
-  
-  # aggregate to weekly (7-day) sums
-  row_groups <- gl(nrow(ret_age_daily_reported) %/% 7 + (nrow(ret_age_daily_reported) %% 7 > 0), 7, nrow(ret_age_daily_reported))
-  ret_weekly_reported <- aggregate(ret_age_daily_reported, by = list(row_groups), FUN = sum)[, -1]  # matrix weeks x ages
-  
-  date_key <- data.frame(t = 1:nrow(ret_weekly_reported), date = dates)
-  
-  # compute weekly totals (reported)
-  weekly_totals_reported <- rowSums(as.matrix(ret_weekly_reported), na.rm = TRUE)
-  peak_idx <- if (length(weekly_totals_reported)) which.max(weekly_totals_reported) else NA
-  peak_date <- if (!is.na(peak_idx) && length(peak_idx)) date_key$date[peak_idx] else NA
-  reported_peak <- if (!is.na(peak_idx)) weekly_totals_reported[peak_idx] else NA
-  # estimate underlying symptomatic at peak (divide by reporting rate)
-  peak_symptomatic_est <- if (!is.na(reported_peak) && p$reporting_rate > 0) reported_peak / p$reporting_rate else NA
+  ret_age_daily_reported <- as.data.frame(ret_age_daily_reported)
+  ret_overall <- rowSums(ret_age_daily_reported)
+  ret_age_daily_reported$t <- 1:nrow(ret_age_daily_reported)
+
+  date_key <- data.frame(t = 1:nrow(ret_age_daily_reported), date = seq(start_date,end_date,by=t_step))
+  ret_age_daily_reported <- left_join(ret_age_daily_reported, date_key, by="t")
+  ret_overall <- date_key %>% mutate(inc = ret_overall)
+  peak_date <- ret_overall %>% filter(inc == max(inc,na.rm=TRUE)) %>% pull(date)
+  reported_peak <- ret_overall %>% filter(inc == max(inc,na.rm=TRUE)) %>% pull(inc)
+  peak_symptomatic_est <- reported_peak/p$reporting_rate
+  ret_weekly_reported <- ret_age_daily_reported %>% filter(date %in% dates) %>% group_by(date) %>% filter(t == min(t))
+
   # cumulative incidence in model state: sum 'inc' compartment at final time
   y_base_long <- y_base %>% pivot_longer(-time)
   y_base_long <- y_base_long %>%
     mutate(compartment = stringr::str_split(name, "_", simplify = TRUE)[,1],
            age = as.integer(stringr::str_split(name, "_", simplify = TRUE)[,2]),
            immunity = as.integer(stringr::str_split(name, "_", simplify = TRUE)[,3]))
-  
+
   ## Calculate overall weekly growth rate
   weekly_growth_rate_total <- y_base_long %>% 
     filter(compartment == "inc") %>% 
-    mutate(time=floor(time/7)) %>% 
-    group_by(time) %>% summarize(inc=sum(value)) %>% 
-    mutate(gr=log(inc/lag(inc,1))) 
+    group_by(time) %>% 
+    summarize(inc=sum(value)) %>% ## Combine incidence across groups to get total incidence
+    mutate(cumu_inc = inc/max(inc)) %>% ## Get cumulative incidence
+    ungroup() %>%
+    mutate(inc_lag = lag(inc,7/t_step)) %>% ## Find cumulative incidence a week ago
+    mutate(inc_diff = inc - inc_lag) %>% ## Increase in cases in that time
+    mutate(gr = log(inc_diff) - log(lag(inc_diff,7/t_step))) %>% ## Get GR of incidence today vs. 1 week ago
+    filter(is.finite(gr)) %>%
+    filter(cumu_inc > cumu_inc_threshold_peak_gr)
+  
   
   ## Get peak after the first 4 weeks
-  peak_gr <- weekly_growth_rate_total %>% filter(time >= 5) %>% filter(gr == max(gr))
+  peak_gr <- weekly_growth_rate_total %>% filter(gr == max(gr))
   
   ## By age
   weekly_growth_rate_age <- y_base_long %>% 
-    filter(compartment == "inc") %>%
-    mutate(time=floor(time/7)) %>% 
+    filter(compartment == "inc") %>% 
     group_by(time,age) %>% 
-    summarize(inc=sum(value)) %>%
-    group_by(age) %>% 
-    mutate(gr=log(inc/lag(inc,1))) 
-  
-  peak_gr_age <- weekly_growth_rate_age %>% filter(time >= 5) %>% group_by(age) %>% filter(gr == max(gr))
-  
+    summarize(inc=sum(value)) %>% ## Combine incidence across groups to get total incidence
+    mutate(cumu_inc = inc/max(inc)) %>% ## Get cumulative incidence
+    group_by(age) %>%
+    mutate(inc_lag = lag(inc,7/t_step)) %>% ## Find cumulative incidence a week ago
+    mutate(inc_diff = inc - inc_lag) %>% ## Increase in cases in that time
+    mutate(gr = log(inc_diff) - log(lag(inc_diff,7/t_step))) %>% ## Get GR of incidence today vs. 1 week ago
+    filter(is.finite(gr)) %>%
+    filter(cumu_inc > cumu_inc_threshold_peak_gr)
+    
+  peak_gr_age <- weekly_growth_rate_age %>% group_by(age) %>% filter(gr == max(gr))
   
   # total infections by age at final time
   cumulative_incidence <- y_base_long %>% filter(time == max(time)) %>%
@@ -217,29 +250,31 @@ run_model_once <- function(params) {
 # ---- Run model over different scenarios ----
 
 ## Loop over R0 values
-R0_vals <- seq(1.05,3,by=0.05)
+R0_vals <- seq(1.01,3,by=0.01)
 results_list <- vector("list", length(R0_vals))
 for (i in seq_along(R0_vals)) {
   params <- list(R0=R0_vals[i])
   
   cat(sprintf("[%d/%d] running: R0=%.2f\n",
               i, length(R0_vals),params$R0))
-  
   res <- run_model_once(params)
   tmp_gr <- res$res$weekly_growth_rate_total %>% rename(t=time)
   ## Pull out peak growth rate after 1% of cases have elapsed
-  tmp_gr <- tmp_gr %>% mutate(cumu_inc=cumsum(inc)/sum(inc)) %>% filter(cumu_inc > 0.01) %>% filter(gr == max(gr)) %>%
+  tmp_gr <- tmp_gr %>% 
+    filter(gr == max(gr,na.rm=TRUE)) %>%
     left_join(res$res$date_key) %>%
     select(-c(t,inc)) %>%
-    rename(gr_early_nov=gr,nov_date=date)
+    rename(gr_early_nov=gr,nov_date=date) %>%
+    mutate(gr_early_nov = min(gr_early_nov,2)) ## cap growth rate for better plotting
   
   results_list[[i]] <- bind_cols(res$metrics,tmp_gr)
   ## Pull out growth rates on 1st Oct, 1st Nov, and 1st Dec
 }
 results_tbl_R0 <- bind_rows(results_list)
+#ggplot(results_tbl_R0) + geom_line(aes(x=R0,y=gr_early_nov))
 
 ## Loop over Seed values
-seed_vals <- seq(as.Date("2022-08-01"),as.Date("2022-11-01"),by="7 days")
+seed_vals <- seq(as.Date("2022-08-01"),as.Date("2022-11-01"),by="1 day")
 results_list <- vector("list", length(seed_vals))
 for (i in seq_along(seed_vals)) {
   params <- list(sim_start_date=seed_vals[i])
@@ -248,18 +283,22 @@ for (i in seq_along(seed_vals)) {
               i, length(seed_vals),params$sim_start_date))
   
   res <- run_model_once(params)
+  
   tmp_gr <- res$res$weekly_growth_rate_total %>% rename(t=time)
-  tmp_gr <- tmp_gr %>% mutate(cumu_inc=cumsum(inc)/sum(inc)) %>% filter(cumu_inc > 0.01) %>% filter(gr == max(gr)) %>%
+  ## Pull out peak growth rate after 1% of cases have elapsed
+  tmp_gr <- tmp_gr %>% 
+    filter(gr == max(gr,na.rm=TRUE)) %>%
     left_join(res$res$date_key) %>%
     select(-c(t,inc)) %>%
-    rename(gr_early_nov=gr,nov_date=date)
+    rename(gr_early_nov=gr,nov_date=date)%>%
+    mutate(gr_early_nov = min(gr_early_nov,2)) ## cap growth rate for better plotting
   
   results_list[[i]] <- bind_cols(res$metrics,tmp_gr)
 }
 results_tbl_seed <- bind_rows(results_list)
 
 ## Loop over immune escape vals
-overall_escape_vals <- seq(0,1,by=0.05)
+overall_escape_vals <- seq(0,1,by=0.01)
 results_list <- vector("list", length(overall_escape_vals))
 for (i in seq_along(overall_escape_vals)) {
   params <- list(overall_immune_escape=overall_escape_vals[i])
@@ -268,17 +307,21 @@ for (i in seq_along(overall_escape_vals)) {
               i, length(overall_escape_vals),params$overall_immune_escape))
   
   res <- run_model_once(params)
+  
   tmp_gr <- res$res$weekly_growth_rate_total %>% rename(t=time)
-  tmp_gr <- tmp_gr %>% mutate(cumu_inc=cumsum(inc)/sum(inc)) %>% filter(cumu_inc > 0.01) %>% filter(gr == max(gr)) %>%
+  ## Pull out peak growth rate after 1% of cases have elapsed
+  tmp_gr <- tmp_gr %>% 
+    filter(gr == max(gr,na.rm=TRUE)) %>%
     left_join(res$res$date_key) %>%
     select(-c(t,inc)) %>%
-    rename(gr_early_nov=gr,nov_date=date)
+    rename(gr_early_nov=gr,nov_date=date)%>%
+    mutate(gr_early_nov = min(gr_early_nov,2)) ## cap growth rate for better plotting
   results_list[[i]] <- bind_cols(res$metrics,tmp_gr)
 }
 results_tbl_escape <- bind_rows(results_list)
 
 ## Loop over immune escape in younger ages
-overall_escape_vals <- seq(0,1,by=0.05)
+overall_escape_vals <- seq(0,1,by=0.01)
 results_list <- vector("list", length(overall_escape_vals))
 for (i in seq_along(overall_escape_vals)) {
   prop_immune_younger <- 0.3
@@ -290,11 +333,15 @@ for (i in seq_along(overall_escape_vals)) {
               i, length(overall_escape_vals),overall_escape_vals[i]))
   
   res <- run_model_once(params)
+  
   tmp_gr <- res$res$weekly_growth_rate_total %>% rename(t=time)
-  tmp_gr <- tmp_gr %>% mutate(cumu_inc=cumsum(inc)/sum(inc)) %>% filter(cumu_inc > 0.01) %>% filter(gr == max(gr)) %>%
+  ## Pull out peak growth rate after 1% of cases have elapsed
+  tmp_gr <- tmp_gr %>% 
+    filter(gr == max(gr,na.rm=TRUE)) %>%
     left_join(res$res$date_key) %>%
     select(-c(t,inc)) %>%
-    rename(gr_early_nov=gr,nov_date=date)
+    rename(gr_early_nov=gr,nov_date=date)%>%
+    mutate(gr_early_nov = min(gr_early_nov,2)) ## cap growth rate for better plotting
   results_list[[i]] <- bind_cols(res$metrics,tmp_gr)
   results_list[[i]]$index <- overall_escape_vals[i]
 }
@@ -347,7 +394,7 @@ ylims <- tibble(
     "Peak infection incidence \nper 100,000"
   ),
   ymin = c(0, 0, 0, 0),
-  ymax = c(0.35, 0.35, 1.5, 5000)
+  ymax = c(0.35, 0.35, 1.5, 2000)
 )
 
 
@@ -395,6 +442,7 @@ p_escape <- ggplot(results_tbl_escape_long) +
   geom_vline(xintercept=1, linetype="dashed", color="grey") +
   geom_line(aes(x=variable, y=value, color=name),linewidth=0.75) + 
   geom_hline(data=max_grs,aes(yintercept=y,linetype=`Surveillance data`)) +
+  scale_x_continuous(breaks=seq(0,1,by=0.2)) +
   
   geom_blank(
     data = ylims,
@@ -428,12 +476,13 @@ ylims <- tibble(
     "Peak infection incidence \nper 100,000"
   ),
   ymin = c(0, 0, 0, 0),
-  ymax = c(0.35, 0.35, 1.5, 5000)
+  ymax = c(0.35, 0.35, 1.5, 2500)
 )
 
 p_escape_young <- ggplot(results_tbl_young_escape_long) +
   geom_vline(xintercept=1, linetype="dashed", color="grey") +
   geom_hline(data=max_grs,aes(yintercept=y,linetype=`Surveillance data`)) +
+  scale_x_continuous(breaks=seq(0,1,by=0.2)) +
   
   geom_blank(
     data = ylims,
@@ -502,14 +551,17 @@ p_main <- p_r0/
   p_escape/
   p_escape_young/
   p_seed + plot_layout(guides="collect")&
-  theme(legend.position='bottom',axis.text = element_text(size=12),
-        axis.title = element_text(size=14),
+  theme(legend.position='bottom',
+        axis.text = element_text(size=10),
+        axis.title = element_text(size=12),
         strip.text = element_text(size=12),
         legend.title=element_text(size=12),
-        legend.text=element_text(size=12),
+        legend.text=element_text(size=10),
         title = element_text(size=16))
 
 
 
 ggsave("~/Documents/GitHub/influenza_H3N2_k_clade/figures/fig_model_grid_results.png", p_main, width=10, height=10)
 ggsave("~/Documents/GitHub/influenza_H3N2_k_clade/figures/fig_model_grid_results.pdf", p_main, width=10, height=10)
+
+beepr::beep(4)

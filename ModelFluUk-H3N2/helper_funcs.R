@@ -3,7 +3,10 @@
 contacts_all <- polymod$contacts
 polymod_base <- polymod
 
-build_contact_matrices <- function(input) {
+## Optionally fix seed to ensure each contact matrix sampled is the same
+build_contact_matrices <- function(input, seed=NULL) {
+  if(!is.null(seed)) set.seed(seed)
+  
   polymod_c_term <- contact_matrix(polymod_base,
                                    countries = "United Kingdom",
                                    age.limits = age_breaks,
